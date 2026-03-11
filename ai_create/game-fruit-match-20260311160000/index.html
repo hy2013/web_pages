@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>水果消消乐</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #2d1b4e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .title { font-size: 24px; font-weight: 900; color: #ff6; margin-bottom: 10px; }
+        #ui { width: 100%; max-width: 300px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(255,255,100,0.2); border: 2px solid #ff6; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #ff6; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; background: #1a0f2e; padding: 8px; border-radius: 8px; }
+        .cell { width: 38px; height: 38px; background: #3d2b5e; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer; }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #ff6 0%, #cc3 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #000; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">🍒 水果消消乐</div>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div class="grid" id="grid"></div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const fruits = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒'];
+        let grid = [], score = 0, selected = null;
+
+        function init() { grid = []; for (let i = 0; i < 8; i++) { grid[i] = []; for (let j = 0; j < 7; j++) { grid[i][j] = fruits[Math.floor(Math.random() * fruits.length)]; } } score = 0; selected = null; render(); checkMatches(); }
+
+        function render() { const g = document.getElementById('grid'); g.innerHTML = ''; grid.forEach((row, i) => row.forEach((f, j) => { const d = document.createElement('div'); d.className = 'cell'; d.textContent = f; d.onclick = () => clickCell(i, j); g.appendChild(d); })); document.getElementById('score').textContent = score; }
+
+        function clickCell(i, j) {
+            if (selected) {
+                if (selected.i === i && selected.j === j) { selected = null; }
+                else if (Math.abs(selected.i - i) + Math.abs(selected.j - j) === 1) {
+                    [grid[selected.i][selected.j], grid[i][j]] = [grid[i][j], grid[selected.i][selected.j]];
+                    selected = null;
+                    if (!checkMatches()) { [grid[selected?.i || 0][selected?.j || 0], grid[i][j]] = [grid[i][j], grid[selected?.i || 0][selected?.j || 0]]; }
+                    render();
+                } else { selected = { i, j }; }
+            } else { selected = { i, j }; }
+            render();
+        }
+
+        function checkMatches() {
+            let matched = false;
+            for (let i = 0; i < 8; i++) { for (let j = 0; j < 5; j++) { if (grid[i][j] && grid[i][j] === grid[i][j+1] && grid[i][j] === grid[i][j+2]) { grid[i][j] = grid[i][j+1] = grid[i][j+2] = null; score += 30; matched = true; } } }
+            for (let j = 0; j < 7; j++) { for (let i = 0; i < 6; i++) { if (grid[i][j] && grid[i][j] === grid[i+1][j] && grid[i][j] === grid[i+2][j]) { grid[i][j] = grid[i+1][j] = grid[i+2][j] = null; score += 30; matched = true; } } }
+            if (matched) { setTimeout(checkMatches, 200); render(); }
+            return matched;
+        }
+
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

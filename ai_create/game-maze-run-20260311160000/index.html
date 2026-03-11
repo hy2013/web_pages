@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>迷宫大冒险</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #2a2a3a; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #1a1a2a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(26,26,42,0.95); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #fc6; margin-bottom: 15px; }
+        .subtitle { color: #a8a; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #fc6 0%, #da4 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="startScreen">
+            <div class="title">🌀 迷宫大冒险</div>
+            <div class="subtitle">滑动控制小球<br>到达绿色终点<br>尽可能快</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, player = {x: 0, y: 0}, goal = {x: 0, y: 0}, maze = [], cols = 9, rows = 12, cellSize, gameRunning = false, startTime = 0;
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; cellSize = Math.min(w / cols, h / rows); }
+        function initMaze() { maze = []; for (let i = 0; i < rows; i++) { maze[i] = []; for (let j = 0; j < cols; j++) { maze[i][j] = {walls: [true, true, true, true], visited: false}; } } for (let i = 0; i < rows; i++) { for (let j = 0; j < cols; j++) { const idx = Math.floor(Math.random() * 4); maze[i][j].walls[idx] = false; } } }
+        function init() { resize(); initMaze(); player = {x: 0, y: 0}; goal = {x: cols-1, y: rows-1}; gameRunning = false; startTime = 0; draw(); }
+
+        function update() { if (!gameRunning) return; draw(); requestAnimationFrame(update); }
+        function draw() { ctx.fillStyle = '#1a1a2a'; ctx.fillRect(0, 0, w, h); const ox = (w - cols * cellSize) / 2, oy = (h - rows * cellSize) / 2; for (let i = 0; i < rows; i++) { for (let j = 0; j < cols; j++) { const x = ox + j * cellSize, y = oy + i * cellSize; ctx.strokeStyle = '#fc6'; ctx.lineWidth = 2; if (maze[i][j].walls[0]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + cellSize, y); ctx.stroke(); } if (maze[i][j].walls[1]) { ctx.beginPath(); ctx.moveTo(x + cellSize, y); ctx.lineTo(x + cellSize, y + cellSize); ctx.stroke(); } if (maze[i][j].walls[2]) { ctx.beginPath(); ctx.moveTo(x + cellSize, y + cellSize); ctx.lineTo(x, y + cellSize); ctx.stroke(); } if (maze[i][j].walls[3]) { ctx.beginPath(); ctx.moveTo(x, y + cellSize); ctx.lineTo(x, y); ctx.stroke(); } } } ctx.fillStyle = '#4f4'; ctx.fillRect(ox + goal.x * cellSize + 5, oy + goal.y * cellSize + 5, cellSize - 10, cellSize - 10); ctx.fillStyle = '#f44'; ctx.beginPath(); ctx.arc(ox + player.x * cellSize + cellSize/2, oy + player.y * cellSize + cellSize/2, cellSize/3, 0, Math.PI*2); ctx.fill(); }
+
+        let sx, sy;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; startTime = Date.now(); } sx = e.touches[0].clientX; sy = e.touches[0].clientY; });
+        c.addEventListener('touchend', e => { const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; if (Math.abs(dx) > Math.abs(dy)) { if (dx > 0 && player.x < cols-1 && !maze[player.y][player.x].walls[1]) player.x++; else if (dx < 0 && player.x > 0 && !maze[player.y][player.x].walls[3]) player.x--; } else { if (dy > 0 && player.y < rows-1 && !maze[player.y][player.x].walls[2]) player.y++; else if (dy < 0 && player.y > 0 && !maze[player.y][player.x].walls[0]) player.y--; } if (player.x === goal.x && player.y === goal.y) { const time = ((Date.now() - startTime) / 1000).toFixed(1); alert('恭喜! 用时: ' + time + '秒'); init(); document.getElementById('startScreen').style.display = 'flex'; } });
+        c.addEventListener('click', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; startTime = Date.now(); } });
+        init();
+    </script>
+</body>
+</html>

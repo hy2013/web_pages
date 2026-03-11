@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>重力滚球</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #222; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #1a1a1a; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,200,0,0.3); border: 2px solid #fc0; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #fc0; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(26,26,26,0.95); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #fc0; margin-bottom: 15px; }
+        .subtitle { color: #aaa; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #fc0 0%, #da0 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>关卡: <b id="level">1</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🎳 重力滚球</div>
+            <div class="subtitle">倾斜设备控制小球<br>收集星星到达终点<br>避开红色障碍</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, level = 1, gameRunning = false, tiltX = 0;
+        let ball = { x: 0, y: 0, vx: 0, vy: 0, r: 12 }, stars = [], obstacles = [], goal = { x: 0, y: 0, r: 20 };
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); ball = { x: 50, y: h/2, vx: 0, vy: 0, r: 12 }; stars = []; obstacles = []; score = 0; goal = { x: w - 50, y: h/2, r: 20 }; for (let i = 0; i < 5; i++) { stars.push({ x: 100 + Math.random() * (w - 200), y: Math.random() * (h - 100) + 50, collected: false }); } for (let i = 0; i < 3; i++) { obstacles.push({ x: 150 + Math.random() * (w - 300), y: Math.random() * (h - 100) + 50, r: 15 + Math.random() * 10 }); } document.getElementById('score').textContent = 0; document.getElementById('level').textContent = level; }
+
+        function update() {
+            if (!gameRunning) return;
+            ball.vx += tiltX * 0.5;
+            ball.vy += tiltX * 0.3;
+            ball.vx *= 0.98;
+            ball.vy *= 0.98;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            if (ball.x < ball.r) { ball.x = ball.r; ball.vx *= -0.5; }
+            if (ball.x > w - ball.r) { ball.x = w - ball.r; ball.vx *= -0.5; }
+            if (ball.y < ball.r) { ball.y = ball.r; ball.vy *= -0.5; }
+            if (ball.y > h - ball.r) { ball.y = h - ball.r; ball.vy *= -0.5; }
+            stars.forEach(s => { if (!s.collected && Math.sqrt((ball.x - s.x) ** 2 + (ball.y - s.y) ** 2) < ball.r + 10) { s.collected = true; score += 100; } });
+            obstacles.forEach(o => { if (Math.sqrt((ball.x - o.x) ** 2 + (ball.y - o.y) ** 2) < ball.r + o.r) { ball.vx *= -1; ball.vy *= -1; } });
+            if (Math.sqrt((ball.x - goal.x) ** 2 + (ball.y - goal.y) ** 2) < ball.r + goal.r) { level++; score += 500; alert('过关! 进入第' + level + '关'); init(); }
+            document.getElementById('score').textContent = score;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#333'; for (let i = 0; i < 10; i++) { ctx.beginPath(); ctx.arc(i * 50 + 25, 50, 3, 0, Math.PI*2); ctx.arc(i * 50 + 25, h - 50, 3, 0, Math.PI*2); ctx.fill(); } stars.forEach(s => { if (!s.collected) { ctx.fillStyle = '#fc0'; ctx.beginPath(); ctx.arc(s.x, s.y, 10, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ff0'; ctx.beginPath(); for (let i = 0; i < 5; i++) { const angle = i * Math.PI * 2 / 5 - Math.PI / 2; ctx.lineTo(s.x + Math.cos(angle) * 15, s.y + Math.sin(angle) * 15); } ctx.fill(); } }); obstacles.forEach(o => { ctx.fillStyle = '#f44'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#a00'; ctx.beginPath(); ctx.arc(o.x, o.y, o.r * 0.5, 0, Math.PI*2); ctx.fill(); }); ctx.fillStyle = '#4f4'; ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#2a2'; ctx.beginPath(); ctx.arc(goal.x, goal.y, goal.r * 0.6, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#fc0'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#da0'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r * 0.6, 0, Math.PI*2); ctx.fill(); }
+
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchmove', e => { if (gameRunning) tiltX = (e.touches[0].clientX - w/2) * 0.02; });
+        c.addEventListener('mousemove', e => { if (gameRunning) tiltX = (e.clientX - w/2) * 0.02; });
+        c.addEventListener('click', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } });
+        init();
+    </script>
+</body>
+</html>

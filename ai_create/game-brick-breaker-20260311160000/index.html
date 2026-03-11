@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>打砖块</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #0f0f1a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(100,200,255,0.2); border: 2px solid #6cf; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #6cf; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(15,15,26,0.95); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #6cf; margin-bottom: 15px; text-shadow: 0 0 20px #6cf; }
+        .subtitle { color: #8aa; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #6cf 0%, #48c 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>关卡: <b id="level">1</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🧱 打砖块</div>
+            <div class="subtitle">拖动挡板反弹球<br>消除所有砖块过关<br>漏球游戏结束</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, level = 1, gameRunning = false;
+        let paddle = { x: 0, w: 100, h: 15 }, ball = { x: 0, y: 0, vx: 0, vy: 0, r: 10 }, bricks = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); paddle = { x: w/2 - 50, w: 100, h: 15 }; ball = { x: w/2, y: h - 50, vx: 4, vy: -4, r: 10 }; score = 0; initBricks(); document.getElementById('score').textContent = 0; document.getElementById('level').textContent = level; }
+        function initBricks() { bricks = []; const rows = 4 + Math.floor(level / 2), cols = 6; const brickW = (w - 40) / cols, brickH = 20; for (let r = 0; r < rows; r++) { for (let c = 0; c < cols; c++) { bricks.push({ x: 20 + c * brickW, y: 80 + r * (brickH + 5), w: brickW - 4, h: brickH, color: ['#f44', '#f90', '#ff0', '#4f4', '#44f', '#f6f'][r % 6] }); } } }
+
+        function update() {
+            if (!gameRunning) return;
+            ball.x += ball.vx; ball.y += ball.vy;
+            if (ball.x < ball.r || ball.x > w - ball.r) ball.vx *= -1;
+            if (ball.y < ball.r) ball.vy *= -1;
+            if (ball.y > h - ball.r) { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+            if (ball.x > paddle.x && ball.x < paddle.x + paddle.w && ball.y + ball.r > h - 40) { ball.vy = -Math.abs(ball.vy); ball.vx += (ball.x - (paddle.x + paddle.w/2)) * 0.1; }
+            bricks.forEach((b, i) => { if (ball.x > b.x && ball.x < b.x + b.w && ball.y > b.y && ball.y < b.y + b.h) { ball.vy *= -1; bricks.splice(i, 1); score += 10; document.getElementById('score').textContent = score; } });
+            if (bricks.length === 0) { level++; alert('过关! 进入第' + level + '关'); init(); }
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, w, h); bricks.forEach(b => { ctx.fillStyle = b.color; ctx.fillRect(b.x, b.y, b.w, b.h); }); ctx.fillStyle = '#6cf'; ctx.fillRect(paddle.x, h - 40, paddle.w, paddle.h); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill(); }
+
+        let dragging = false;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } dragging = true; });
+        c.addEventListener('touchmove', e => { if (dragging) paddle.x = e.touches[0].clientX - paddle.w/2; if (paddle.x < 0) paddle.x = 0; if (paddle.x > w - paddle.w) paddle.x = w - paddle.w; });
+        c.addEventListener('touchend', () => dragging = false);
+        c.addEventListener('mousedown', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } dragging = true; });
+        c.addEventListener('mousemove', e => { if (dragging) paddle.x = e.clientX - paddle.w/2; if (paddle.x < 0) paddle.x = 0; if (paddle.x > w - paddle.w) paddle.x = w - paddle.w; });
+        c.addEventListener('mouseup', () => dragging = false);
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>愤怒的小鸟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #87CEEB 0%, #90EE90 50%, #228B22 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,255,255,0.8); border: 2px solid #228B22; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #228B22; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(135,206,235,0.95); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #f00; margin-bottom: 15px; text-shadow: 1px 1px #fff; }
+        .subtitle { color: #333; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(180deg, #32CD32 0%, #228B22 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>小鸟: <b id="birds">3</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🐦 愤怒的小鸟</div>
+            <div class="subtitle">拖拽小鸟发射<br>击倒木块砸猪<br>3只小鸟内过关</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, birds = 3, gameRunning = false, dragging = false;
+        let bird = { x: 0, y: 0, vx: 0, vy: 0, r: 15 }, pigs = [], blocks = [], gravity = 0.5;
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); bird = { x: 80, y: h - 150, vx: 0, vy: 0, r: 15 }; pigs = [{ x: w - 80, y: h - 100, r: 20 }, { x: w - 120, y: h - 180, r: 15 }]; blocks = [{ x: w - 100, y: h - 60, w: 20, h: 60 }, { x: w - 140, y: h - 60, w: 20, h: 60 }, { x: w - 120, y: h - 140, w: 60, h: 20 }]; score = 0; birds = 3; document.getElementById('score').textContent = 0; document.getElementById('birds').textContent = 3; }
+
+        function update() {
+            if (!gameRunning) return;
+            if (bird.vx !== 0 || bird.vy !== 0) { bird.vy += gravity; bird.x += bird.vx; bird.y += bird.vy; }
+            if (bird.x > w + 50 || bird.y > h + 50) { if (pigs.length > 0) { birds--; document.getElementById('birds').textContent = birds; if (birds <= 0) { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } else { bird = { x: 80, y: h - 150, vx: 0, vy: 0, r: 15 }; } } else { gameRunning = false; alert('恭喜过关! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } }
+            pigs.forEach((p, i) => { const dist = Math.sqrt((bird.x - p.x) ** 2 + (bird.y - p.y) ** 2); if (dist < bird.r + p.r) { pigs.splice(i, 1); score += 500; document.getElementById('score').textContent = score; } });
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#90EE90'; ctx.fillRect(0, h * 0.7, w, h * 0.3); ctx.fillStyle = '#228B22'; ctx.fillRect(0, h - 30, w, 30); blocks.forEach(b => { ctx.fillStyle = '#8B4513'; ctx.fillRect(b.x, b.y, b.w, b.h); }); pigs.forEach(p => { ctx.fillStyle = '#7CFC00'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(p.x - 5, p.y - 3, 3, 0, Math.PI * 2); ctx.arc(p.x + 5, p.y - 3, 3, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(p.x, p.y + 5, 4, 0, Math.PI * 2); ctx.fill(); }); ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(bird.x - 4, bird.y - 4, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(bird.x - 2, bird.y - 4, 2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#8B4513'; ctx.beginPath(); ctx.moveTo(bird.x + 8, bird.y - 5); ctx.lineTo(bird.x + 18, bird.y - 10); ctx.lineTo(bird.x + 18, bird.y); ctx.fill(); }
+
+        let startX, startY;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } startX = e.touches[0].clientX; startY = e.touches[0].clientY; dragging = true; });
+        c.addEventListener('touchend', e => { if (dragging && gameRunning) { const dx = startX - e.changedTouches[0].clientX, dy = startY - e.changedTouches[0].clientY; bird.vx = dx * 0.15; bird.vy = dy * 0.15; dragging = false; } });
+        c.addEventListener('mousedown', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } startX = e.clientX; startY = e.clientY; dragging = true; });
+        c.addEventListener('mouseup', e => { if (dragging && gameRunning) { const dx = startX - e.clientX, dy = startY - e.clientY; bird.vx = dx * 0.15; bird.vy = dy * 0.15; dragging = false; } });
+        init();
+    </script>
+</body>
+</html>

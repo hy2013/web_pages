@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>星际迷航</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #000; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(0,255,255,0.2); border: 2px solid #0ff; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #0ff; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.9); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #0ff; margin-bottom: 15px; text-shadow: 0 0 20px #0ff; }
+        .subtitle { color: #8aa; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #0ff 0%, #08c 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🚀 星际迷航</div>
+            <div class="subtitle">点击发射激光<br>击毁小行星<br>收集能量宝石</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, gameRunning = false;
+        let player = { x: 0, y: 0 }, bullets = [], asteroids = [], gems = [], stars = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); player = { x: w/2, y: h - 80 }; bullets = []; asteroids = []; gems = []; stars = []; score = 0; for (let i = 0; i < 50; i++) stars.push({ x: Math.random() * w, y: Math.random() * h, size: Math.random() * 2, speed: 0.5 + Math.random() }); document.getElementById('score').textContent = 0; }
+
+        function update() {
+            if (!gameRunning) return;
+            stars.forEach(s => { s.y += s.speed; if (s.y > h) { s.y = 0; s.x = Math.random() * w; } });
+            if (Math.random() < 0.03) asteroids.push({ x: Math.random() * w, y: -30, size: 20 + Math.random() * 30, speed: 2 + Math.random() * 3, rot: 0 });
+            if (Math.random() < 0.01) gems.push({ x: Math.random() * w, y: -20, speed: 1.5 });
+            bullets.forEach((b, i) => { b.y -= 10; if (b.y < -20) bullets.splice(i, 1); });
+            asteroids.forEach((a, i) => { a.y += a.speed; a.rot += 0.05; bullets.forEach((b, bi) => { if (Math.abs(b.x - a.x) < a.size && Math.abs(b.y - a.y) < a.size) { asteroids.splice(i, 1); bullets.splice(bi, 1); score += 20; } }); if (a.y > h + 50) asteroids.splice(i, 1); });
+            gems.forEach((g, i) => { g.y += g.speed; if (Math.abs(player.x - g.x) < 30 && Math.abs(player.y - g.y) < 30) { score += 50; gems.splice(i, 1); } if (g.y > h + 30) gems.splice(i, 1); });
+            asteroids.forEach(a => { if (Math.abs(player.x - a.x) < a.size && Math.abs(player.y - a.y) < a.size) { gameOver(); } });
+            score++; document.getElementById('score').textContent = score;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); stars.forEach(s => { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill(); }); asteroids.forEach(a => { ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(a.rot); ctx.fillStyle = '#888'; ctx.beginPath(); for (let i = 0; i < 8; i++) { const angle = i * Math.PI / 4; const r = a.size * (0.7 + Math.random() * 0.3); ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r); } ctx.fill(); ctx.restore(); }); gems.forEach(g => { ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(g.x, g.y - 10); ctx.lineTo(g.x + 8, g.y); ctx.lineTo(g.x, g.y + 10); ctx.lineTo(g.x - 8, g.y); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(g.x - 2, g.y - 3, 2, 0, Math.PI*2); ctx.fill(); }); bullets.forEach(b => { ctx.fillStyle = '#ff0'; ctx.fillRect(b.x - 2, b.y - 8, 4, 16); }); ctx.fillStyle = '#0ff'; ctx.beginPath(); ctx.moveTo(player.x, player.y - 25); ctx.lineTo(player.x - 15, player.y + 15); ctx.lineTo(player.x + 15, player.y + 15); ctx.fill(); ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(player.x - 5, player.y, 3, 0, Math.PI*2); ctx.arc(player.x + 5, player.y, 3, 0, Math.PI*2); ctx.fill(); }
+
+        function gameOver() { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } else { bullets.push({ x: player.x, y: player.y }); } });
+        c.addEventListener('click', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } else { bullets.push({ x: player.x, y: player.y }); } });
+        init();
+    </script>
+</body>
+</html>

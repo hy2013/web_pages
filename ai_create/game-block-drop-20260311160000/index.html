@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>方块消除</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .title { font-size: 24px; font-weight: 900; color: #6cf; margin-bottom: 10px; }
+        #ui { width: 100%; max-width: 280px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(100,200,255,0.2); border: 2px solid #6cf; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #6cf; font-size: 14px; }
+        .board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; background: #2a2a4a; padding: 8px; border-radius: 8px; }
+        .cell { width: 40px; height: 40px; background: #1a1a2e; border-radius: 4px; }
+        .cell.I { background: #0ff; }
+        .cell.O { background: #ff0; }
+        .cell.T { background: #a0f; }
+        .cell.S { background: #0f0; }
+        .cell.Z { background: #f00; }
+        .cell.J { background: #00f; }
+        .cell.L { background: #fa0; }
+        .next { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; background: #2a2a4a; padding: 5px; border-radius: 5px; }
+        .next .cell { width: 20px; height: 20px; }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #6cf 0%, #48c 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #000; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">🧱 方块消除</div>
+        <div id="ui">
+            <div class="score-box"><span>得分: <b id="score">0</b></span></div>
+            <div class="score-box"><span>下一个</span></div>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="next" id="next" style="display:none"></div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const colors = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+        const shapes = { I: [[1,1,1,1]], O: [[1,1],[1,1]], T: [[0,1,0],[1,1,1]], S: [[0,1,1],[1,1,0]], Z: [[1,1,0],[0,1,1]], J: [[1,0,0],[1,1,1]], L: [[0,0,1],[1,1,1]] };
+        let board = [], score = 0, currentPiece = null, gameRunning = false, dropInterval, lastDrop;
+
+        function init() {
+            board = Array(12).fill(null).map(() => Array(6).fill(''));
+            score = 0; gameRunning = true;
+            document.getElementById('score').textContent = 0;
+            spawnPiece();
+            lastDrop = Date.now();
+            dropInterval = setInterval(update, 50);
+            render();
+        }
+
+        function spawnPiece() {
+            const type = colors[Math.floor(Math.random() * colors.length)];
+            currentPiece = { type, shape: shapes[type], x: 2, y: 0, color: type };
+            if (collide(0, 0)) { gameRunning = false; clearInterval(dropInterval); alert('游戏结束! 得分: ' + score); }
+        }
+
+        function collide(dx, dy) {
+            const p = currentPiece;
+            for (let r = 0; r < p.shape.length; r++) {
+                for (let c = 0; c < p.shape[r].length; c++) {
+                    if (p.shape[r][c]) {
+                        const nx = p.x + c + dx, ny = p.y + r + dy;
+                        if (nx < 0 || nx >= 6 || ny >= 12 || board[ny][nx]) return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        function rotate() {
+            const old = currentPiece.shape;
+            const rotated = old[0].map((_, i) => old.map(row => row[i]).reverse());
+            const temp = currentPiece.shape;
+            currentPiece.shape = rotated;
+            if (collide(0, 0)) currentPiece.shape = temp;
+        }
+
+        function merge() {
+            currentPiece.shape.forEach((row, r) => row.forEach((v, c) => {
+                if (v) board[currentPiece.y + r][currentPiece.x + c] = currentPiece.color;
+            }));
+            let lines = 0;
+            for (let r = 11; r >= 0; r--) {
+                if (board[r].every(cell => cell)) { board.splice(r, 1); board.unshift(Array(6).fill('')); lines++; r++; }
+            }
+            score += lines * 100;
+            document.getElementById('score').textContent = score;
+            spawnPiece();
+        }
+
+        function update() {
+            if (!gameRunning) return;
+            if (Date.now() - lastDrop > 800) {
+                if (!collide(0, 1)) { currentPiece.y++; }
+                else { merge(); }
+                lastDrop = Date.now();
+                render();
+            }
+        }
+
+        function render() {
+            const b = document.getElementById('board'); b.innerHTML = '';
+            const display = JSON.parse(JSON.stringify(board));
+            if (currentPiece) currentPiece.shape.forEach((row, r) => row.forEach((v, c) => { if (v) display[currentPiece.y + r][currentPiece.x + c] = currentPiece.color; }));
+            display.forEach(row => row.forEach(cell => { const d = document.createElement('div'); d.className = 'cell' + (cell ? ' ' + cell : ''); b.appendChild(d); }));
+        }
+
+        function move(dir) { if (!collide(dir, 0)) { currentPiece.x += dir; render(); } }
+
+        document.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') move(-1); if (e.key === 'ArrowRight') move(1); if (e.key === 'ArrowUp') rotate(); if (e.key === 'ArrowDown') { if (!collide(0, 1)) { currentPiece.y++; render(); } } });
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

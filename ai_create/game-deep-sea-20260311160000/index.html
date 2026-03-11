@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>深海潜泳</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #001a33; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #0066aa 0%, #001a33 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(100,200,255,0.3); border: 2px solid #6cf; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #6cf; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,26,51,0.95); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #6cf; margin-bottom: 15px; text-shadow: 0 0 20px #6cf; }
+        .subtitle { color: #8ac; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #6cf 0%, #48c 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>氧气: <b id="oxygen">100</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🐠 深海潜泳</div>
+            <div class="subtitle">滑动控制方向<br>收集小鱼和气泡<br>躲避鲨鱼和大鱼</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, oxygen = 100, gameRunning = false;
+        let player = { x: 0, y: 0, vx: 0, vy: 0 }, enemies = [], bubbles = [], fish = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); player = { x: w/2, y: h/2, vx: 0, vy: 0 }; enemies = []; bubbles = []; fish = []; score = 0; oxygen = 100; document.getElementById('score').textContent = 0; document.getElementById('oxygen').textContent = 100; }
+
+        function update() {
+            if (!gameRunning) return;
+            player.x += player.vx * 3;
+            player.y += player.vy * 3;
+            if (player.x < 20) player.x = 20;
+            if (player.x > w - 20) player.x = w - 20;
+            if (player.y < 20) player.y = 20;
+            if (player.y > h - 20) player.y = h - 20;
+            oxygen -= 0.05;
+            document.getElementById('oxygen').textContent = Math.floor(oxygen);
+            if (oxygen <= 0) { gameOver(); return; }
+            if (Math.random() < 0.02) enemies.push({ x: w + 20, y: Math.random() * (h - 100) + 50, size: 30 + Math.random() * 20, speed: 2 + Math.random() * 2 });
+            if (Math.random() < 0.03) bubbles.push({ x: Math.random() * w, y: h + 20, r: 5 + Math.random() * 10, speed: 1 + Math.random() });
+            if (Math.random() < 0.025) fish.push({ x: -20, y: Math.random() * (h - 100) + 50, size: 15 + Math.random() * 10, speed: 2 + Math.random() * 2 });
+            enemies.forEach((e, i) => { e.x -= e.speed; if (Math.abs(player.x - e.x) < e.size && Math.abs(player.y - e.y) < e.size) gameOver(); if (e.x < -50) enemies.splice(i, 1); });
+            fish.forEach((f, i) => { f.x += f.speed; if (Math.abs(player.x - f.x) < f.size && Math.abs(player.y - f.y) < f.size) { score += 10; fish.splice(i, 1); } if (f.x > w + 50) fish.splice(i, 1); });
+            bubbles.forEach((b, i) => { b.y -= b.speed; oxygen += 2; if (oxygen > 100) oxygen = 100; if (Math.abs(player.x - b.x) < b.r + 15 && Math.abs(player.y - b.y) < b.r + 15) { score += 5; bubbles.splice(i, 1); } if (b.y < -20) bubbles.splice(i, 1); });
+            score++; document.getElementById('score').textContent = score;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#001a33'; ctx.fillRect(0, 0, w, h); const gradient = ctx.createLinearGradient(0, 0, 0, h); gradient.addColorStop(0, '#0066aa'); gradient.addColorStop(1, '#001a33'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, w, h); fish.forEach(f => { ctx.fillStyle = '#ff6'; ctx.beginPath(); ctx.ellipse(f.x, f.y, f.size, f.size/2, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#fc0'; ctx.beginPath(); ctx.moveTo(f.x + f.size, f.y); ctx.lineTo(f.x + f.size + 10, f.y - 5); ctx.lineTo(f.x + f.size + 10, f.y + 5); ctx.fill(); }); enemies.forEach(e => { ctx.fillStyle = '#666'; ctx.beginPath(); ctx.ellipse(e.x, e.y, e.size, e.size*0.6, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#f00'; ctx.beginPath(); ctx.arc(e.x - e.size*0.3, e.y - e.size*0.2, 4, 0, Math.PI*2); ctx.arc(e.x + e.size*0.3, e.y - e.size*0.2, 4, 0, Math.PI*2); ctx.fill(); }); bubbles.forEach(b => { ctx.strokeStyle = 'rgba(200,255,255,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI*2); ctx.stroke(); }); ctx.fillStyle = '#ff9966'; ctx.beginPath(); ctx.ellipse(player.x, player.y, 20, 12, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(player.x - 5, player.y - 3, 4, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#00a'; ctx.beginPath(); ctx.arc(player.x + 5, player.y + 5, 8, 0, Math.PI); ctx.fill(); }
+
+        function gameOver() { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+
+        let sx, sy;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } sx = e.touches[0].clientX; sy = e.touches[0].clientY; });
+        c.addEventListener('touchmove', e => { if (gameRunning) { player.vx = (e.touches[0].clientX - sx) * 0.05; player.vy = (e.touches[0].clientY - sy) * 0.05; } });
+        c.addEventListener('mousedown', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } sx = e.clientX; sy = e.clientY; });
+        c.addEventListener('mousemove', e => { if (gameRunning) { player.vx = (e.clientX - sx) * 0.05; player.vy = (e.clientY - sy) * 0.05; } });
+        init();
+    </script>
+</body>
+</html>

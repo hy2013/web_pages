@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>农场躲避</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #87CEEB 0%, #90EE90 50%, #228B22 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,255,255,0.8); border: 2px solid #228B22; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #228B22; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.9); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #228B22; margin-bottom: 15px; }
+        .subtitle { color: #666; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(180deg, #32CD32 0%, #228B22 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🐔 农场躲避</div>
+            <div class="subtitle">点击让鸡跳起来<br>躲避狐狸和老鹰<br>坚持越久分数越高</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, gameRunning = false;
+        let player = { x: 0, y: 0, vy: 0 }, enemies = [], bgY = 0;
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); player = { x: w * 0.3, y: h - 100, vy: 0 }; enemies = []; bgY = 0; score = 0; document.getElementById('score').textContent = 0; }
+
+        function jump() { player.vy = -12; }
+
+        function update() {
+            if (!gameRunning) return;
+            player.vy += 0.5;
+            player.y += player.vy;
+            bgY = (bgY + 3) % 50;
+            const groundY = h - 80;
+            if (player.y > groundY) { player.y = groundY; player.vy = 0; }
+            if (player.y < 30) { player.y = 30; player.vy = 0; }
+            if (Math.random() < 0.02) enemies.push({ x: w + 30, y: groundY - 20, type: 'fox', speed: 4 });
+            if (Math.random() < 0.015) enemies.push({ x: w + 30, y: 50 + Math.random() * 30, type: 'eagle', speed: 5 });
+            enemies.forEach((e, i) => { e.x -= e.speed; if (Math.abs(player.x - e.x) < 25 && Math.abs(player.y - e.y) < 20) { gameOver(); } if (e.x < -50) enemies.splice(i, 1); });
+            score++; document.getElementById('score').textContent = score;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#90EE90'; ctx.fillRect(0, h * 0.6, w, h * 0.4); ctx.fillStyle = '#228B22'; ctx.fillRect(0, h - 80, w, 20); for (let i = 0; i < 10; i++) { ctx.fillStyle = '#2E8B57'; ctx.fillRect(i * 60 - (bgY % 60), h - 90, 4, 30); ctx.beginPath(); ctx.arc(i * 60 - (bgY % 60) + 2, h - 95, 10, 0, Math.PI * 2); ctx.fill(); } enemies.forEach(e => { if (e.type === 'fox') { ctx.fillStyle = '#ff6600'; ctx.fillRect(e.x - 15, e.y - 15, 30, 20); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x - 5, e.y - 20, 5, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(e.x - 5, e.y - 20, 2, 0, Math.PI * 2); ctx.fill(); } else { ctx.fillStyle = '#4a3728'; ctx.beginPath(); ctx.ellipse(e.x, e.y, 20, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x, e.y - 5, 10, 0, Math.PI); ctx.fill(); } }); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(player.x, player.y, 20, 15, 0, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(player.x - 5, player.y - 5, 3, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff6600'; ctx.beginPath(); ctx.moveTo(player.x + 10, player.y); ctx.lineTo(player.x + 20, player.y - 5); ctx.lineTo(player.x + 20, player.y + 5); ctx.fill(); ctx.fillStyle = '#ff0'; ctx.fillRect(player.x - 3, player.y + 10, 6, 8); }
+
+        function gameOver() { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } else jump(); });
+        c.addEventListener('mousedown', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } else jump(); });
+        init();
+    </script>
+</body>
+</html>

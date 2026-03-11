@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>切水果</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #2d1b4e 0%, #1a1a2e 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,200,100,0.3); border: 2px solid #fc6; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #fc6; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(26,26,46,0.95); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #fc6; margin-bottom: 15px; text-shadow: 0 0 20px #fc6; }
+        .subtitle { color: #a8a; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #fc6 0%, #da4 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>生命: <b id="lives">3</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🔪 切水果</div>
+            <div class="subtitle">滑动切割水果<br>躲避炸弹<br>漏掉3个水果游戏结束</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, lives = 3, gameRunning = false;
+        let fruits = [], trail = [], lastTime = 0;
+        const fruitTypes = [
+            { color: '#ff6b6b', emoji: '🍎' },
+            { color: '#ffa500', emoji: '🍊' },
+            { color: '#ffd700', emoji: '🍋' },
+            { color: '#ff69b4', emoji: '🍉' },
+            { color: '#9b59b6', emoji: '🍇' }
+        ];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); fruits = []; trail = []; score = 0; lives = 3; document.getElementById('score').textContent = 0; document.getElementById('lives').textContent = 3; }
+
+        function spawnFruit() {
+            const type = Math.random() > 0.15 ? fruitTypes[Math.floor(Math.random() * fruitTypes.length)] : { color: '#333', emoji: '💣', bomb: true };
+            fruits.push({
+                x: Math.random() * (w - 100) + 50,
+                y: h + 30,
+                vx: (Math.random() - 0.5) * 4,
+                vy: -(12 + Math.random() * 4),
+                type,
+                size: 35,
+                rotation: 0,
+                rotSpeed: (Math.random() - 0.5) * 0.2
+            });
+        }
+
+        function update(timestamp) {
+            if (!gameRunning) return;
+            if (timestamp - lastTime > 800) { spawnFruit(); lastTime = timestamp; }
+            fruits.forEach(f => { f.x += f.vx; f.y += f.vy; f.vy += 0.25; f.rotation += f.rotSpeed; });
+            fruits = fruits.filter(f => { if (f.y > h + 50 && f.vy > 0) { if (!f.type.bomb) { lives--; document.getElementById('lives').textContent = lives; if (lives <= 0) { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } } return false; } return true; });
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, w, h); fruits.forEach(f => { ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rotation); ctx.font = f.size + 'px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(f.type.emoji, 0, 0); ctx.restore(); }); if (trail.length > 1) { ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(trail[0].x, trail[0].y); trail.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke(); } if (trail.length > 10) trail.shift(); }
+
+        let lastX, lastY;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); lastTime = 0; update(0); } lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; trail = [{ x: lastX, y: lastY }]; });
+        c.addEventListener('touchmove', e => { const x = e.touches[0].clientX, y = e.touches[0].clientY; trail.push({ x, y }); fruits.forEach(f => { if (Math.abs(f.x - x) < f.size && Math.abs(f.y - y) < f.size) { if (f.type.bomb) { gameRunning = false; alert('炸弹! 游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } else { score += 10; document.getElementById('score').textContent = score; fruits = fruits.filter(fr => fr !== f); } } }); lastX = x; lastY = y; });
+        c.addEventListener('mousedown', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); lastTime = 0; update(0); } lastX = e.clientX; lastY = e.clientY; trail = [{ x: lastX, y: lastY }]; });
+        c.addEventListener('mousemove', e => { if (!gameRunning) return; const x = e.clientX, y = e.clientY; trail.push({ x, y }); fruits.forEach(f => { if (Math.abs(f.x - x) < f.size && Math.abs(f.y - y) < f.size) { if (f.type.bomb) { gameRunning = false; alert('炸弹! 游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } else { score += 10; document.getElementById('score').textContent = score; fruits = fruits.filter(fr => fr !== f); } } }); lastX = x; lastY = y; });
+        init();
+    </script>
+</body>
+</html>

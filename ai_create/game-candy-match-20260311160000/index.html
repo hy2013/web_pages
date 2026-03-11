@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>糖果对对碰</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #ffe4e1; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .title { font-size: 24px; font-weight: 900; color: #ff69b4; margin-bottom: 10px; }
+        #ui { width: 100%; max-width: 300px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(255,105,180,0.2); border: 2px solid #ff69b4; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #ff69b4; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; background: #fff; padding: 8px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .cell { width: 42px; height: 42px; background: #fff0f5; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; box-shadow: inset 0 -2px 5px rgba(0,0,0,0.1); }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #fff; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">🍬 糖果对对碰</div>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div class="grid" id="grid"></div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const candies = ['🍬', '🍭', '🍫', '🍩', '🍪', '🧁'];
+        let grid = [], score = 0, selected = null;
+
+        function init() { grid = []; for (let i = 0; i < 7; i++) { grid[i] = []; for (let j = 0; j < 6; j++) { grid[i][j] = candies[Math.floor(Math.random() * candies.length)]; } } score = 0; selected = null; render(); checkMatches(); }
+
+        function render() { const g = document.getElementById('grid'); g.innerHTML = ''; grid.forEach((row, i) => row.forEach((c, j) => { const d = document.createElement('div'); d.className = 'cell'; d.textContent = c; d.onclick = () => clickCell(i, j); g.appendChild(d); })); document.getElementById('score').textContent = score; }
+
+        function clickCell(i, j) {
+            if (selected) {
+                if (selected.i === i && selected.j === j) { selected = null; }
+                else if (Math.abs(selected.i - i) + Math.abs(selected.j - j) === 1) {
+                    [grid[selected.i][selected.j], grid[i][j]] = [grid[i][j], grid[selected.i][selected.j]];
+                    selected = null;
+                    if (!checkMatches()) { [grid[selected?.i || 0][selected?.j || 0], grid[i][j]] = [grid[i][j], grid[selected?.i || 0][selected?.j || 0]]; }
+                    render();
+                } else { selected = { i, j }; }
+            } else { selected = { i, j }; }
+            render();
+        }
+
+        function checkMatches() {
+            let matched = false;
+            for (let i = 0; i < 7; i++) { for (let j = 0; j < 4; j++) { if (grid[i][j] && grid[i][j] === grid[i][j+1] && grid[i][j] === grid[i][j+2]) { grid[i][j] = grid[i][j+1] = grid[i][j+2] = null; score += 30; matched = true; } } }
+            for (let j = 0; j < 6; j++) { for (let i = 0; i < 5; i++) { if (grid[i][j] && grid[i][j] === grid[i+1][j] && grid[i][j] === grid[i+2][j]) { grid[i][j] = grid[i+1][j] = grid[i+2][j] = null; score += 30; matched = true; } } }
+            if (matched) { setTimeout(checkMatches, 200); render(); }
+            return matched;
+        }
+
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

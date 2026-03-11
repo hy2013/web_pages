@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>赛车躲避</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #333; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #222; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,100,100,0.3); border: 2px solid #f66; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #f66; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(34,34,34,0.95); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #f66; margin-bottom: 15px; }
+        .subtitle { color: #aaa; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #f66 0%, #d44 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>速度: <b id="speedLevel">1</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🏎️ 赛车躲避</div>
+            <div class="subtitle">左右滑动控制赛车<br>躲避其他车辆<br>坚持越久速度越快</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, speed = 5, gameRunning = false;
+        let player = { x: 0, lane: 1 }, cars = [], roadLines = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); player = { x: w/2, lane: 1 }; cars = []; roadLines = []; score = 0; speed = 5; for (let i = 0; i < 5; i++) roadLines.push({ y: i * 80 }); document.getElementById('score').textContent = 0; document.getElementById('speedLevel').textContent = 1; }
+
+        function update() {
+            if (!gameRunning) return;
+            roadLines.forEach(l => { l.y += speed; if (l.y > h) l.y = -80; });
+            if (Math.random() < 0.02 + score * 0.0001) { const lane = Math.floor(Math.random() * 3); cars.push({ x: w/4 + lane * w/3, y: -60, color: ['#f00','#00f','#0f0','#ff0','#f0f'][Math.floor(Math.random()*5)] }); }
+            cars.forEach((c, i) => { c.y += speed - 2; if (Math.abs(player.x - c.x) < 40 && Math.abs(h*0.7 - c.y) < 40) gameOver(); if (c.y > h + 50) cars.splice(i, 1); });
+            score++; if (score % 500 === 0) { speed += 1; document.getElementById('speedLevel').textContent = speed - 4; }
+            document.getElementById('score').textContent = score;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#333'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#444'; ctx.fillRect(20, 0, w-40, h); roadLines.forEach(l => { ctx.fillStyle = '#fff'; ctx.fillRect(w/2 - 5, l.y, 10, 40); }); cars.forEach(c => { ctx.fillStyle = c.color; ctx.fillRect(c.x - 20, c.y - 20, 40, 40); ctx.fillStyle = '#000'; ctx.fillRect(c.x - 15, c.y - 10, 30, 8); ctx.fillRect(c.x - 15, c.y + 5, 30, 8); }); ctx.fillStyle = '#f00'; ctx.fillRect(player.x - 18, h*0.7 - 18, 36, 36); ctx.fillStyle = '#ff0'; ctx.fillRect(player.x - 12, h*0.7 - 8, 10, 6); ctx.fillRect(player.x + 2, h*0.7 - 8, 10, 6); ctx.fillStyle = '#888'; ctx.fillRect(player.x - 20, h*0.7 + 15, 8, 6); ctx.fillRect(player.x + 12, h*0.7 + 15, 8, 6); }
+
+        function gameOver() { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+
+        let lastX;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } lastX = e.touches[0].clientX; });
+        c.addEventListener('touchmove', e => { if (gameRunning) { player.x += (e.touches[0].clientX - lastX) * 1.5; player.x = Math.max(w*0.25, Math.min(w*0.75, player.x)); lastX = e.touches[0].clientX; } });
+        c.addEventListener('mousedown', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } lastX = e.clientX; });
+        c.addEventListener('mousemove', e => { if (gameRunning) { player.x += (e.clientX - lastX) * 1.5; player.x = Math.max(w*0.25, Math.min(w*0.75, player.x)); lastX = e.clientX; } });
+        init();
+    </script>
+</body>
+</html>

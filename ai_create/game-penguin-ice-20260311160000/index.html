@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>企鹅滑冰</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #e8f4f8; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #87CEEB 0%, #e8f4f8 50%, #fff 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,255,255,0.8); border: 2px solid #333; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #333; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.9); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #228B22; margin-bottom: 15px; }
+        .subtitle { color: #666; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(180deg, #32CD32 0%, #228B22 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>速度: <b id="speed">1x</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🐧 企鹅滑冰</div>
+            <div class="subtitle">左右滑动躲避冰块<br>收集鱼儿加分<br>滑行距离越远速度越快</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, speed = 3, gameRunning = false;
+        let player = { x: 0, vx: 0 }, obstacles = [], fish = [], bgOffset = 0;
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); player = { x: w/2, vx: 0 }; obstacles = []; fish = []; score = 0; speed = 3; bgOffset = 0; document.getElementById('score').textContent = 0; document.getElementById('speed').textContent = '1x'; }
+
+        function update() {
+            if (!gameRunning) return;
+            player.vx *= 0.9;
+            player.x += player.vx * 4;
+            if (player.x < 25) player.x = 25;
+            if (player.x > w - 25) player.x = w - 25;
+            bgOffset += speed;
+            if (bgOffset > w) bgOffset = 0;
+            if (Math.random() < 0.02) obstacles.push({ x: w + 30, y: h * 0.6 + Math.random() * 50, size: 25 + Math.random() * 20 });
+            if (Math.random() < 0.03) fish.push({ x: w + 20, y: h * 0.4 + Math.random() * 100, size: 20 });
+            obstacles.forEach((o, i) => { o.x -= speed; if (Math.abs(player.x - o.x) < 20 && Math.abs(player.y - o.y || h*0.6 - o.y) < 25) { gameOver(); } if (o.x < -50) obstacles.splice(i, 1); });
+            fish.forEach((f, i) => { f.x -= speed; if (Math.abs(player.x - f.x) < 25 && Math.abs((h*0.6) - f.y) < 25) { score += 15; fish.splice(i, 1); } if (f.x < -40) fish.splice(i, 1); });
+            score++; if (score % 500 === 0) { speed += 0.5; document.getElementById('speed').textContent = (speed/3).toFixed(1) + 'x'; }
+            document.getElementById('score').textContent = score;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#e8f4f8'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#b0e0e6'; ctx.fillRect(0, h*0.55, w, 10); ctx.fillRect(0, h*0.75, w, 10); ctx.fillStyle = '#87CEEB'; ctx.beginPath(); ctx.ellipse(w*0.2 - bgOffset*0.5, h*0.2, 30, 20, 0, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(w*0.7 - bgOffset*0.3, h*0.3, 20, 15, 0, 0, Math.PI*2); ctx.fill(); fish.forEach(f => { ctx.fillStyle = '#ffa500'; ctx.beginPath(); ctx.ellipse(f.x, f.y, f.size, f.size/2, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ff8c00'; ctx.beginPath(); ctx.moveTo(f.x + f.size, f.y); ctx.lineTo(f.x + f.size + 8, f.y - 4); ctx.lineTo(f.x + f.size + 8, f.y + 4); ctx.fill(); }); ctx.fillStyle = '#000'; ctx.fillRect(player.x - 3, h*0.6 - 5, 6, 20); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(player.x, h*0.6 - 15, 20, 15, 0, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(player.x - 7, h*0.6 - 18, 3, 0, Math.PI*2); ctx.arc(player.x + 7, h*0.6 - 18, 3, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#ffa500'; ctx.beginPath(); ctx.arc(player.x, h*0.6 - 10, 5, 0, Math.PI*2); ctx.fill(); obstacles.forEach(o => { ctx.fillStyle = '#a8d8ea'; ctx.beginPath(); ctx.moveTo(o.x, o.y - o.size); ctx.lineTo(o.x + o.size, o.y - o.size*0.3); ctx.lineTo(o.x + o.size*0.5, o.y + o.size*0.5); ctx.lineTo(o.x - o.size*0.5, o.y + o.size*0.5); ctx.lineTo(o.x - o.size, o.y - o.size*0.3); ctx.fill(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(o.x - 5, o.y, 3, 0, Math.PI*2); ctx.fill(); }); }
+
+        function gameOver() { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+
+        let lastX;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } lastX = e.touches[0].clientX; });
+        c.addEventListener('touchmove', e => { if (gameRunning) player.vx += (e.touches[0].clientX - lastX) * 0.02; lastX = e.touches[0].clientX; });
+        c.addEventListener('mousedown', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } lastX = e.clientX; });
+        c.addEventListener('mousemove', e => { if (gameRunning) player.vx += (e.clientX - lastX) * 0.02; lastX = e.clientX; });
+        init();
+    </script>
+</body>
+</html>
