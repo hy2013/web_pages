@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>找不同</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; padding: 10px; }
+        .title { font-size: 24px; font-weight: 900; color: #ffd700; margin-bottom: 10px; }
+        #ui { width: 100%; max-width: 350px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(255,215,0,0.2); border: 2px solid #ffd700; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #ffd700; font-size: 14px; }
+        .game-area { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+        .image { width: 170px; height: 170px; background: #2a2a4a; border-radius: 8px; position: relative; overflow: hidden; }
+        .image canvas { width: 100%; height: 100%; }
+        .circle { position: absolute; width: 30px; height: 30px; border: 3px solid #f00; border-radius: 50%; transform: translate(-50%, -50%); display: none; pointer-events: none; }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #ffd700 0%, #daa520 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #000; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">🔍 找不同</div>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>剩余: <b id="left">5</b></span></div></div>
+        <div class="game-area">
+            <div class="image" id="img1"><canvas id="c1"></canvas><div class="circle" id="circle1"></div></div>
+            <div class="image" id="img2"><canvas id="c2"></canvas><div class="circle" id="circle2"></div></div>
+        </div>
+        <button class="btn" id="restartBtn">下一关</button>
+    </div>
+    <script>
+        const shapes = ['●', '■', '▲', '◆', '★', '♠', '♥', '♣'];
+        const colors = ['#f44', '#4f4', '#44f', '#ff4', '#f4f', '#4ff'];
+        let score = 0, diffs = [], found = [], level = 1;
+
+        function init() {
+            const c1 = document.getElementById('c1'), c2 = document.getElementById('c2'), ctx1 = c1.getContext('2d'), ctx2 = c2.getContext('2d');
+            c1.width = c2.width = 170; c1.height = c2.height = 170;
+            diffs = []; found = [];
+            const diffCount = 3 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < diffCount; i++) diffs.push({ x: 30 + Math.random() * 110, y: 30 + Math.random() * 110, shape: shapes[Math.floor(Math.random() * shapes.length)], color: colors[Math.floor(Math.random() * colors.length)] });
+            ctx1.fillStyle = '#3a3a5a'; ctx1.fillRect(0, 0, 170, 170);
+            ctx2.fillStyle = '#3a3a5a'; ctx2.fillRect(0, 0, 170, 170);
+            for (let i = 0; i < 8; i++) { const x = 20 + Math.random() * 130, y = 20 + Math.random() * 130, s = shapes[Math.floor(Math.random() * shapes.length)], col = colors[Math.floor(Math.random() * colors.length)]; ctx1.font = '24px Arial'; ctx1.fillStyle = col; ctx1.fillText(s, x, y); ctx2.font = '24px Arial'; ctx2.fillStyle = col; ctx2.fillText(s, x, y); }
+            diffs.forEach(d => { ctx1.font = '24px Arial'; ctx1.fillStyle = d.color; ctx1.fillText(d.shape, d.x, d.y); ctx2.font = '24px Arial'; ctx2.fillStyle = d.color; ctx2.fillText(d.shape, d.x, d.y); });
+            const changeIdx = Math.floor(Math.random() * diffs.length);
+            const orig = diffs[changeIdx];
+            const newShape = shapes[Math.floor(Math.random() * shapes.length)];
+            ctx2.font = '24px Arial'; ctx2.fillStyle = orig.color; ctx2.fillText(newShape, orig.x, orig.y);
+            diffs[changeIdx].shape = newShape;
+            document.getElementById('score').textContent = score;
+            document.getElementById('left').textContent = diffCount - found.length;
+            document.getElementById('circle1').style.display = 'none';
+            document.getElementById('circle2').style.display = 'none';
+        }
+
+        function handleClick(e, isLeft) {
+            const rect = e.target.getBoundingClientRect(), x = (e.clientX - rect.left) * (170 / rect.width), y = (e.clientY - rect.top) * (170 / rect.height);
+            const clicked = diffs.find(d => Math.sqrt((d.x - x) ** 2 + (d.y - y) ** 2) < 20 && !found.includes(d));
+            if (clicked && !found.includes(clicked)) {
+                found.push(clicked);
+                document.getElementById('left').textContent = diffs.length - found.length;
+                const circle1 = document.getElementById('circle1'), circle2 = document.getElementById('circle2');
+                if (isLeft) { circle1.style.display = 'block'; circle1.style.left = clicked.x / 170 * 100 + '%'; circle1.style.top = clicked.y / 170 * 100 + '%'; }
+                else { circle2.style.display = 'block'; circle2.style.left = clicked.x / 170 * 100 + '%'; circle2.style.top = clicked.y / 170 * 100 + '%'; }
+                score += 100; document.getElementById('score').textContent = score;
+                if (found.length >= diffs.length) setTimeout(() => { alert('过关! +200分'); score += 200; init(); }, 100);
+            }
+        }
+
+        document.getElementById('c1').addEventListener('click', e => handleClick(e, true));
+        document.getElementById('c2').addEventListener('click', e => handleClick(e, false));
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

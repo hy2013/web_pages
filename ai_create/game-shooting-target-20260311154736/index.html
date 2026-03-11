@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>射击靶心</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #0f0f1a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,100,100,0.2); border: 2px solid #f66; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #f88; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(15,15,26,0.97); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #f66; margin-bottom: 15px; }
+        .subtitle { color: #88a; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #f66 0%, #d44 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🎯 射击靶心</div>
+            <div class="subtitle">点击靶心得分<br>越接近中心分数越高<br>限时30秒</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, timeLeft = 30, gameRunning = false, targets = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); score = 0; timeLeft = 30; targets = []; spawnTarget(); document.getElementById('score').textContent = 0; }
+
+        function spawnTarget() { targets = [{ x: Math.random() * (w - 100) + 50, y: Math.random() * (h - 200) + 100, r: 40 }]; }
+
+        function update() {
+            if (!gameRunning) return;
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, w, h); targets.forEach(t => { for (let i = 5; i > 0; i--) { ctx.fillStyle = i === 1 ? '#f00' : i === 2 ? '#fff' : i === 3 ? '#f00' : i === 4 ? '#fff' : '#f00'; ctx.beginPath(); ctx.arc(t.x, t.y, t.r * i / 5, 0, Math.PI * 2); ctx.fill(); } ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(t.x, t.y, 5, 0, Math.PI * 2); ctx.fill(); }); ctx.fillStyle = '#fff'; ctx.font = '20px Arial'; ctx.fillText('时间: ' + timeLeft, 20, 60); }
+
+        canvas.addEventListener('click', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); const timer = setInterval(() => { timeLeft--; if (timeLeft <= 0) { clearInterval(timer); gameRunning = false; alert('时间到! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } }, 1000); update(); return; } const rect = canvas.getBoundingClientRect(), x = e.clientX - rect.left, y = e.clientY - rect.top; targets.forEach(t => { const dist = Math.sqrt((x - t.x) ** 2 + (y - t.y) ** 2); if (dist < t.r) { score += Math.floor((t.r - dist) / t.r * 100); document.getElementById('score').textContent = score; spawnTarget(); } }); });
+        init();
+    </script>
+</body>
+</html>

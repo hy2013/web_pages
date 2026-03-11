@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>宝石消除</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        #ui { width: 100%; max-width: 320px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(255,215,0,0.2); border: 2px solid #ffd700; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #ffd700; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; background: #2a2a4a; padding: 8px; border-radius: 8px; }
+        .cell { width: 45px; height: 45px; background: #3a3a5a; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #ffd700 0%, #daa520 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #000; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div class="grid" id="grid"></div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const gems = ['💎', '🔴', '🟢', '🔵', '🟡', '🟣'];
+        let grid = [], score = 0, selected = null;
+
+        function init() { grid = []; for (let i = 0; i < 8; i++) { grid[i] = []; for (let j = 0; j < 6; j++) { grid[i][j] = gems[Math.floor(Math.random() * gems.length)]; } } score = 0; selected = null; render(); checkMatches(); }
+
+        function render() {
+            const g = document.getElementById('grid'); g.innerHTML = '';
+            grid.forEach((row, i) => row.forEach((gem, j) => {
+                const d = document.createElement('div'); d.className = 'cell'; d.textContent = gem; d.onclick = () => clickCell(i, j); g.appendChild(d);
+            }));
+            document.getElementById('score').textContent = score;
+        }
+
+        function clickCell(i, j) {
+            if (selected) {
+                if (selected.i === i && selected.j === j) { selected = null; }
+                else if (Math.abs(selected.i - i) + Math.abs(selected.j - j) === 1) {
+                    [grid[selected.i][selected.j], grid[i][j]] = [grid[i][j], grid[selected.i][selected.j]];
+                    selected = null;
+                    if (!checkMatches()) { [grid[selected?.i || 0][selected?.j || 0], grid[i][j]] = [grid[i][j], grid[selected?.i || 0][selected?.j || 0]]; }
+                    render();
+                } else { selected = { i, j }; }
+            } else { selected = { i, j }; }
+            render();
+        }
+
+        function checkMatches() {
+            let matched = false;
+            for (let i = 0; i < 8; i++) { for (let j = 0; j < 4; j++) { if (grid[i][j] && grid[i][j] === grid[i][j+1] && grid[i][j] === grid[i][j+2]) { grid[i][j] = grid[i][j+1] = grid[i][j+2] = null; score += 30; matched = true; } } }
+            for (let j = 0; j < 6; j++) { for (let i = 0; i < 6; i++) { if (grid[i][j] && grid[i][j] === grid[i+1][j] && grid[i][j] === grid[i+2][j]) { grid[i][j] = grid[i+1][j] = grid[i+2][j] = null; score += 30; matched = true; } } }
+            if (matched) { setTimeout(checkMatches, 200); render(); }
+            return matched;
+        }
+
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>俄罗斯方块</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #0f0f1a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box, .level-box { background: rgba(100, 100, 255, 0.2); border: 2px solid #66f; border-radius: 8px; padding: 8px 15px; }
+        .score-box span, .level-box span { color: #aaf; font-size: 16px; font-weight: bold; }
+        #startScreen, #gameOverScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(15, 15, 26, 0.97); z-index: 20; }
+        #gameOverScreen { display: none; }
+        .title { font-size: 32px; font-weight: 900; color: #66f; text-shadow: 0 0 20px #66f; margin-bottom: 15px; }
+        .subtitle { color: #88a; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #66f 0%, #44d 100%); border: none; padding: 14px 40px; font-size: 18px; font-weight: bold; color: #fff; border-radius: 25px; cursor: pointer; box-shadow: 0 0 20px rgba(100, 100, 255, 0.5); }
+        .final-score { font-size: 22px; color: #f66; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div class="score-box"><span>得分: <b id="score">0</b></span></div>
+            <div class="level-box"><span>等级: <b id="level">1</b></span></div>
+        </div>
+        <div id="startScreen">
+            <div class="title">俄罗斯方块</div>
+            <div class="subtitle">左右滑动移动<br>点击旋转方块<br>消除行得分</div>
+            <button class="btn" id="startBtn">开始游戏</button>
+        </div>
+        <div id="gameOverScreen">
+            <div class="title">游戏结束</div>
+            <div class="final-score">最终得分: <span id="finalScore">0</span></div>
+            <button class="btn" id="restartBtn">再来一次</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, cellSize, cols = 10, rows = 20;
+        let board = [], score = 0, level = 1, gameRunning = false;
+        let currentPiece = null, gameLoop, lastTime = 0, dropTimer = 0;
+        const SHAPES = [
+            { shape: [[1,1,1,1]], color: '#0ff' },
+            { shape: [[1,1],[1,1]], color: '#ff0' },
+            { shape: [[1,1,1],[0,1,0]], color: '#f0f' },
+            { shape: [[1,1,1],[1,0,0]], color: '#f80' },
+            { shape: [[1,1,1],[0,0,1]], color: '#00f' },
+            { shape: [[1,1,0],[0,1,1]], color: '#0f0' },
+            { shape: [[0,1,1],[1,1,0]], color: '#f00' }
+        ];
+
+        function resize() {
+            const c = document.getElementById('gameContainer');
+            width = c.clientWidth; height = c.clientHeight;
+            canvas.width = width; canvas.height = height;
+            cellSize = Math.floor(Math.min(width * 0.9, height * 0.85) / cols);
+        }
+
+        function init() {
+            resize(); window.addEventListener('resize', resize);
+            board = Array(rows).fill(null).map(() => Array(cols).fill(0));
+            score = 0; level = 1; spawnPiece(); updateUI();
+        }
+
+        function spawnPiece() {
+            const p = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            currentPiece = { shape: p.shape.map(r => [...r]), color: p.color, x: Math.floor(cols/2)-1, y: 0 };
+            if (collide(board, currentPiece)) gameOver();
+        }
+
+        function collide(b, p) {
+            for (let r = 0; r < p.shape.length; r++) {
+                for (let c = 0; c < p.shape[r].length; c++) {
+                    if (p.shape[r][c] && (p.y+r >= rows || p.x+c < 0 || p.x+c >= cols || b[p.y+r][p.x+c])) return true;
+                }
+            }
+            return false;
+        }
+
+        function merge(b, p) {
+            p.shape.forEach((r, ri) => r.forEach((v, ci) => { if (v) b[p.y+ri][p.x+ci] = p.color; }));
+        }
+
+        function clearLines() {
+            for (let r = rows-1; r >= 0; r--) {
+                if (board[r].every(c => c)) {
+                    board.splice(r, 1);
+                    board.unshift(Array(cols).fill(0));
+                    score += 100 * level;
+                    level = Math.floor(score / 500) + 1;
+                    r++;
+                }
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('level').textContent = level;
+        }
+
+        function move(dir) {
+            if (!gameRunning) return;
+            currentPiece.x += dir;
+            if (collide(board, currentPiece)) currentPiece.x -= dir;
+        }
+
+        function rotate() {
+            if (!gameRunning) return;
+            const old = currentPiece.shape;
+            currentPiece.shape = old[0].map((_, i) => old.map(r => r[i]).reverse());
+            if (collide(board, currentPiece)) currentPiece.shape = old;
+        }
+
+        function drop() {
+            currentPiece.y++;
+            if (collide(board, currentPiece)) {
+                currentPiece.y--;
+                merge(board, currentPiece);
+                clearLines();
+                spawnPiece();
+            }
+            dropTimer = 0;
+        }
+
+        function update(t) {
+            if (!gameRunning) return;
+            const dt = t - lastTime;
+            if (dt > 100) { lastTime = t; return; }
+            dropTimer += dt;
+            if (dropTimer > Math.max(100, 600 - level * 50)) drop();
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            const ox = (width - cols*cellSize)/2, oy = (height - rows*cellSize)/2;
+            ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, width, height);
+            ctx.strokeStyle = '#1a1a3a'; ctx.lineWidth = 1;
+            for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(ox, oy+r*cellSize); ctx.lineTo(ox+cols*cellSize, oy+r*cellSize); ctx.stroke(); }
+            for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(ox+c*cellSize, oy); ctx.lineTo(ox+c*cellSize, oy+rows*cellSize); ctx.stroke(); }
+            board.forEach((row, r) => row.forEach((c, ci) => { if (c) { ctx.fillStyle = c; ctx.shadowColor = c; ctx.shadowBlur = 10; ctx.fillRect(ox+ci*cellSize+1, oy+r*cellSize+1, cellSize-2, cellSize-2); ctx.shadowBlur = 0; } }));
+            if (currentPiece) {
+                currentPiece.shape.forEach((row, r) => row.forEach((v, c) => { if (v) { ctx.fillStyle = currentPiece.color; ctx.shadowColor = currentPiece.color; ctx.shadowBlur = 15; ctx.fillRect(ox+(currentPiece.x+c)*cellSize+1, oy+(currentPiece.y+r)*cellSize+1, cellSize-2, cellSize-2); ctx.shadowBlur = 0; } }));
+            }
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            gameRunning = true; init(); lastTime = performance.now(); requestAnimationFrame(update);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        let sx, sy;
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; if (!gameRunning) startGame(); });
+        c.addEventListener('touchend', e => { if (!gameRunning) return; const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; if (Math.abs(dx) > 30) move(dx > 0 ? 1 : -1); else rotate(); });
+        c.addEventListener('click', e => { if (!gameRunning) startGame(); else rotate(); });
+        document.getElementById('startBtn').onclick = startGame;
+        document.getElementById('restartBtn').onclick = startGame;
+        init();
+    </script>
+</body>
+</html>

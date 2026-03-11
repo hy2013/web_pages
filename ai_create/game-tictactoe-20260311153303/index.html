@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>井字棋</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .title { font-size: 32px; font-weight: 900; color: #fff; margin-bottom: 20px; text-shadow: 0 0 15px #66f; }
+        .status { font-size: 20px; color: #ff0; margin-bottom: 20px; height: 30px; }
+        .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; background: #2a2a4a; padding: 10px; border-radius: 15px; }
+        .cell { width: 90px; height: 90px; background: #1a1a2e; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 50px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .cell.taken { cursor: default; }
+        .cell:hover:not(.taken) { background: #2a2a4e; }
+        .cell.x { color: #0ff; text-shadow: 0 0 20px #0ff; }
+        .cell.o { color: #f0f; text-shadow: 0 0 20px #f0f; }
+        .score { display: flex; gap: 30px; margin-top: 25px; }
+        .score-box { text-align: center; padding: 10px 20px; border-radius: 10px; }
+        .score-box.p1 { background: rgba(0,255,255,0.2); border: 2px solid #0ff; }
+        .score-box.p2 { background: rgba(255,0,255,0.2); border: 2px solid #f0f; }
+        .score-box span { color: #fff; font-size: 16px; }
+        .score-box .val { font-size: 24px; font-weight: bold; display: block; }
+        .btn { margin-top: 20px; background: linear-gradient(135deg, #66f 0%, #44d 100%); border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">井字棋</div>
+        <div class="status" id="status">你的回合 (X)</div>
+        <div class="board" id="board">
+            <div class="cell" data-i="0"></div>
+            <div class="cell" data-i="1"></div>
+            <div class="cell" data-i="2"></div>
+            <div class="cell" data-i="3"></div>
+            <div class="cell" data-i="4"></div>
+            <div class="cell" data-i="5"></div>
+            <div class="cell" data-i="6"></div>
+            <div class="cell" data-i="7"></div>
+            <div class="cell" data-i="8"></div>
+        </div>
+        <div class="score">
+            <div class="score-box p1"><span class="val" id="p1Score">0</span><span>你 (X)</span></div>
+            <div class="score-box p2"><span class="val" id="p2Score">0</span><span>AI (O)</span></div>
+        </div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const cells = document.querySelectorAll('.cell');
+        const status = document.getElementById('status');
+        let board = ['','','','','','','','',''];
+        let player = 'X';
+        let gameOver = false;
+        let p1Score = 0, p2Score = 0;
+        const WIN = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+        function checkWin(b, p) {
+            return WIN.some(combo => combo.every(i => b[i] === p));
+        }
+
+        function checkDraw(b) {
+            return b.every(c => c !== '');
+        }
+
+        function aiMove() {
+            let best = -1, bestScore = -Infinity;
+            for (let i = 0; i < 9; i++) {
+                if (board[i] === '') {
+                    board[i] = 'O';
+                    let score = minimax(board, 0, false);
+                    board[i] = '';
+                    if (score > bestScore) { bestScore = score; best = i; }
+                }
+            }
+            if (best !== -1) { board[best] = 'O'; updateCell(best); }
+            if (checkWin(board, 'O')) { endGame('AI获胜!'); return; }
+            if (checkDraw(board)) { endGame('平局!'); return; }
+            player = 'X'; status.textContent = '你的回合 (X)';
+        }
+
+        function minimax(b, depth, isMax) {
+            if (checkWin(b, 'O')) return 10 - depth;
+            if (checkWin(b, 'X')) return depth - 10;
+            if (checkDraw(b)) return 0;
+            if (isMax) {
+                let best = -Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (b[i] === '') { b[i] = 'O'; best = Math.max(best, minimax(b, depth+1, false)); b[i] = ''; }
+                }
+                return best;
+            } else {
+                let best = Infinity;
+                for (let i = 0; i < 9; i++) {
+                    if (b[i] === '') { b[i] = 'X'; best = Math.min(best, minimax(b, depth+1, true)); b[i] = ''; }
+                }
+                return best;
+            }
+        }
+
+        function updateCell(i) {
+            const cell = cells[i];
+            cell.textContent = board[i];
+            cell.classList.add('taken', board[i].toLowerCase());
+        }
+
+        function endGame(msg) {
+            gameOver = true;
+            status.textContent = msg;
+            if (msg.includes('你')) p1Score++;
+            if (msg.includes('AI')) p2Score++;
+            document.getElementById('p1Score').textContent = p1Score;
+            document.getElementById('p2Score').textContent = p2Score;
+        }
+
+        function reset() {
+            board = ['','','','','','','','',''];
+            cells.forEach(c => { c.textContent = ''; c.classList.remove('taken','x','o'); });
+            gameOver = false; player = 'X'; status.textContent = '你的回合 (X)';
+        }
+
+        cells.forEach(cell => {
+            cell.addEventListener('click', () => {
+                const i = parseInt(cell.dataset.i);
+                if (gameOver || board[i] !== '' || player !== 'X') return;
+                board[i] = 'X'; updateCell(i);
+                if (checkWin(board, 'X')) { endGame('你获胜!'); return; }
+                if (checkDraw(board)) { endGame('平局!'); return; }
+                player = 'O'; status.textContent = 'AI思考中...';
+                setTimeout(aiMove, 500);
+            });
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', reset);
+    </script>
+</body>
+</html>

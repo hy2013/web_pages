@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>平衡木</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #87CEEB; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #87CEEB 0%, #fff 50%, #90EE90 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(255,255,255,0.8); border: 2px solid #333; border-radius: 8px; padding: 8px 15px; }
+        .score-box span { color: #333; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.9); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #228B22; margin-bottom: 15px; }
+        .subtitle { color: #666; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(180deg, #32CD32 0%, #228B22 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🪵 平衡木</div>
+            <div class="subtitle">左右倾斜保持平衡<br>小人掉落游戏结束<br>坚持越久分数越高</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, gameRunning = false, tilt = 0, playerX = 0, playerVX = 0, platform = { angle: 0 };
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); score = 0; tilt = 0; playerX = 0; playerVX = 0; platform.angle = 0; document.getElementById('score').textContent = 0; }
+
+        function update() {
+            if (!gameRunning) return;
+            platform.angle += (tilt - platform.angle) * 0.1;
+            playerVX += platform.angle * 0.5;
+            playerVX *= 0.98;
+            playerX += playerVX;
+            score++; document.getElementById('score').textContent = score;
+            if (Math.abs(playerX) > w * 0.4) { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.clearRect(0, 0, w, h); ctx.save(); ctx.translate(w/2, h/2 + 50); ctx.rotate(platform.angle); ctx.fillStyle = '#8B4513'; ctx.fillRect(-w*0.4, -10, w*0.8, 20); ctx.restore(); ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.arc(w/2 + playerX, h/2 + 30, 15, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#FFA500'; ctx.beginPath(); ctx.arc(w/2 + playerX - 5, h/2 + 25, 5, 0, Math.PI*2); ctx.fill(); }
+
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchmove', e => { if (gameRunning) tilt = (e.touches[0].clientX - w/2) * 0.003; });
+        c.addEventListener('mousemove', e => { if (gameRunning) tilt = (e.clientX - w/2) * 0.003; });
+        c.addEventListener('click', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } });
+        init();
+    </script>
+</body>
+</html>

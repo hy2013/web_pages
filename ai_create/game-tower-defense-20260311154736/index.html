@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>塔防</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a2a1a; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #0a1a0a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box, .gold-box { background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 6px; padding: 5px 10px; }
+        .score-box span, .gold-box span { color: #fff; font-size: 14px; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(10,26,10,0.95); z-index: 20; }
+        .title { font-size: 28px; font-weight: 900; color: #6f6; margin-bottom: 15px; }
+        .subtitle { color: #8a8; font-size: 12px; margin-bottom: 20px; text-align: center; line-height: 1.6; }
+        .btn { background: linear-gradient(180deg, #6f6 0%, #4a4 100%); border: none; padding: 10px 30px; font-size: 14px; font-weight: bold; color: #000; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div class="score-box"><span>波次: <b id="wave">1</b></span></div>
+            <div class="gold-box"><span>金币: <b id="gold">100</b></span></div>
+        </div>
+        <div id="startScreen">
+            <div class="title">🏰 塔防</div>
+            <div class="subtitle">点击放置防御塔<br>阻止敌人到达终点<br>金币升级塔</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, wave = 1, gold = 100, gameRunning = false;
+        let towers = [], enemies = [], projectiles = [], path = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); wave = 1; gold = 100; towers = []; enemies = []; projectiles = []; path = [{x:0, y:h/2}, {x:w*0.3, y:h/2}, {x:w*0.3, y:h*0.7}, {x:w*0.7, y:h*0.7}, {x:w*0.7, y:h/3}, {x:w, y:h/3}]; document.getElementById('wave').textContent = 1; document.getElementById('gold').textContent = 100; }
+
+        function spawnEnemy() { enemies.push({ x: path[0].x, y: path[0].y, hp: 10 + wave * 5, pathIndex: 0, speed: 2 }); }
+
+        function update() {
+            if (!gameRunning) return;
+            if (Math.random() < 0.01 + wave * 0.005) spawnEnemy();
+            enemies.forEach((e, i) => { const target = path[e.pathIndex + 1]; if (!target) { enemies.splice(i, 1); return; } const dx = target.x - e.x, dy = target.y - e.y, dist = Math.sqrt(dx*dx+dy*dy); e.x += (dx/dist) * e.speed; e.y += (dy/dist) * e.speed; if (dist < 5) e.pathIndex++; });
+            towers.forEach(t => { if (!t.cooldown) { const target = enemies.find(e => Math.sqrt((e.x-t.x)**2 + (e.y-t.y)**2) < 150); if (target) { projectiles.push({ x: t.x, y: t.y, tx: target.x, ty: target.y, speed: 8 }); t.cooldown = 30; } } else t.cooldown--; });
+            projectiles.forEach((p, i) => { const dx = p.tx - p.x, dy = p.ty - p.y, dist = Math.sqrt(dx*dx+dy*dy); p.x += (dx/dist) * p.speed; p.y += (dy/dist) * p.speed; enemies.forEach(e => { if (Math.abs(p.x - e.x) < 15 && Math.abs(p.y - e.y) < 15) { e.hp -= 10; projectiles.splice(i, 1); if (e.hp <= 0) { gold += 5; enemies = enemies.filter(en => en !== e); document.getElementById('gold').textContent = gold; } } }); if (Math.abs(p.x - p.tx) < 10 && Math.abs(p.y - p.ty) < 10) projectiles.splice(i, 1); });
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#0a1a0a'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = '#2a4a2a'; ctx.lineWidth = 30; ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y); path.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke(); towers.forEach(t => { ctx.fillStyle = '#44f'; ctx.fillRect(t.x-12, t.y-12, 24, 24); ctx.fillStyle = '#66f'; ctx.fillRect(t.x-6, t.y-6, 12, 12); }); enemies.forEach(e => { ctx.fillStyle = '#f44'; ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI*2); ctx.fill(); }); projectiles.forEach(p => { ctx.fillStyle = '#ff0'; ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); }); }
+
+        canvas.addEventListener('click', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); return; } if (gold >= 50) { const rect = canvas.getBoundingClientRect(); towers.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, cooldown: 0 }); gold -= 50; document.getElementById('gold').textContent = gold; } });
+        init();
+    </script>
+</body>
+</html>

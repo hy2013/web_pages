@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>赛车</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #222; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #333; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box, .speed-box { background: rgba(255,255,255,0.2); border: 2px solid #fff; border-radius: 8px; padding: 8px 15px; }
+        .score-box span, .speed-box span { color: #fff; font-size: 16px; font-weight: bold; }
+        #startScreen, #gameOverScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.85); z-index: 20; }
+        #gameOverScreen { display: none; }
+        .title { font-size: 36px; font-weight: 900; color: #f44; text-shadow: 0 0 20px #f44; margin-bottom: 15px; letter-spacing: 3px; }
+        .subtitle { color: #aaa; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #f44 0%, #c22 100%); border: none; padding: 14px 40px; font-size: 18px; font-weight: bold; color: #fff; border-radius: 25px; cursor: pointer; box-shadow: 0 0 20px rgba(255,68,68,0.5); }
+        .final-score { font-size: 22px; color: #ff0; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div class="score-box"><span>得分: <b id="score">0</b></span></div>
+            <div class="speed-box"><span>速度: <b id="speed">0</b> km/h</span></div>
+        </div>
+        <div id="startScreen">
+            <div class="title">🚗 赛车</div>
+            <div class="subtitle">左右移动躲避障碍<br>坚持越久速度越快<br>撞到障碍游戏结束</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+        <div id="gameOverScreen">
+            <div class="title">游戏结束</div>
+            <div class="final-score">最终得分: <span id="finalScore">0</span></div>
+            <button class="btn" id="restartBtn">再来</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height, score = 0, speed = 0, gameRunning = false;
+        let player, obstacles = [], roadLines = [], lastTime = 0;
+
+        function resize() {
+            const c = document.getElementById('gameContainer');
+            width = c.clientWidth; height = c.clientHeight;
+            canvas.width = width; canvas.height = height;
+        }
+
+        function init() {
+            resize(); window.addEventListener('resize', resize);
+            player = { x: width/2, y: height - 150, w: 40, h: 70 };
+            obstacles = []; roadLines = []; score = 0; speed = 60;
+            for (let i = 0; i < 6; i++) roadLines.push({ y: i * 100 });
+            document.getElementById('score').textContent = 0;
+            document.getElementById('speed').textContent = 60;
+        }
+
+        function spawnObstacle() {
+            obstacles.push({
+                x: Math.random() * (width - 60) + 10,
+                y: -60,
+                w: 40 + Math.random() * 30,
+                h: 40 + Math.random() * 20,
+                type: Math.random() > 0.5 ? 'rock' : 'car'
+            });
+        }
+
+        function update(t) {
+            if (!gameRunning) return;
+            if (t - lastTime > 100) { lastTime = t; return; }
+            
+            speed = Math.min(200, 60 + score * 0.5);
+            score += Math.floor(speed / 10);
+            
+            roadLines.forEach(l => { l.y += speed/10; if (l.y > height) l.y = -100; });
+            
+            if (Math.random() < 0.02 + score * 0.0001) spawnObstacle();
+            
+            obstacles.forEach((o, i) => {
+                o.y += speed/10;
+                if (player.x < o.x + o.w && player.x + player.w > o.x && player.y < o.y + o.h && player.y + player.h > o.y) {
+                    gameOver();
+                }
+                if (o.y > height + 50) obstacles.splice(i, 1);
+            });
+            
+            document.getElementById('score').textContent = score;
+            document.getElementById('speed').textContent = Math.floor(speed);
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.fillStyle = '#444';
+            ctx.fillRect(0, 0, width, height);
+            
+            ctx.fillStyle = '#666';
+            ctx.fillRect(20, 0, width - 40, height);
+            
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.setLineDash([40, 40]);
+            roadLines.forEach(l => {
+                ctx.beginPath(); ctx.moveTo(width/2, l.y); ctx.lineTo(width/2, l.y + 60); ctx.stroke();
+            });
+            ctx.setLineDash([]);
+            
+            obstacles.forEach(o => {
+                if (o.type === 'rock') {
+                    ctx.fillStyle = '#888';
+                } else {
+                    ctx.fillStyle = o.x < width/2 ? '#44f' : '#f44';
+                }
+                ctx.fillRect(o.x, o.y, o.w, o.h);
+            });
+            
+            ctx.fillStyle = '#f44';
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+            ctx.fillStyle = '#88f';
+            ctx.fillRect(player.x + 5, player.y + 10, player.w - 10, 15);
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            gameRunning = true; init(); lastTime = performance.now(); requestAnimationFrame(update);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) startGame(); player.x = e.touches[0].clientX - player.w/2; });
+        c.addEventListener('touchmove', e => { if (gameRunning) { player.x = e.touches[0].clientX - player.w/2; if (player.x < 25) player.x = 25; if (player.x > width - player.w - 25) player.x = width - player.w - 25; }});
+        c.addEventListener('mousemove', e => { if (gameRunning) { player.x = e.clientX - player.w/2; if (player.x < 25) player.x = 25; if (player.x > width - player.w - 25) player.x = width - player.w - 25; }});
+        c.addEventListener('click', () => { if (!gameRunning && document.getElementById('startScreen').style.display !== 'none') startGame(); });
+        document.getElementById('startBtn').onclick = startGame;
+        document.getElementById('restartBtn').onclick = startGame;
+        init();
+    </script>
+</body>
+</html>

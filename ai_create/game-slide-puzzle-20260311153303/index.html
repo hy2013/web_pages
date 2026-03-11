@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>数字华容道</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .title { font-size: 28px; font-weight: 900; color: #fff; margin-bottom: 15px; text-shadow: 0 0 15px #66f; }
+        .info { display: flex; gap: 20px; margin-bottom: 15px; }
+        .info-box { background: rgba(255,255,255,0.1); border: 2px solid #66f; border-radius: 8px; padding: 8px 15px; }
+        .info-box span { color: #aaf; font-size: 14px; }
+        .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #2a2a4a; padding: 10px; border-radius: 12px; }
+        .tile { width: 70px; height: 70px; background: linear-gradient(135deg, #4a4aff 0%, #2a2aff 100%); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; color: #fff; cursor: pointer; transition: all 0.15s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .tile.empty { background: transparent; box-shadow: none; cursor: default; }
+        .tile.correct { background: linear-gradient(135deg, #4afa4a 0%, #2afa2a 100%); }
+        .moves { color: #fff; font-size: 16px; margin-top: 15px; }
+        .btn { margin-top: 15px; background: linear-gradient(135deg, #66f 0%, #44d 100%); border: none; padding: 12px 30px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">数字华容道</div>
+        <div class="info">
+            <div class="info-box"><span>步数: <b id="moves">0</b></span></div>
+            <div class="info-box"><span>时间: <b id="time">0:00</b></span></div>
+        </div>
+        <div class="board" id="board"></div>
+        <div class="moves" id="message"></div>
+        <button class="btn" id="shuffleBtn">重新打乱</button>
+    </div>
+    <script>
+        const board = document.getElementById('board');
+        let tiles = [], moves = 0, startTime = 0, timer = null, solved = false;
+
+        function init() {
+            tiles = Array(16).fill(0).map((_, i) => i + 1);
+            tiles[15] = 0;
+            shuffle();
+            render();
+            startTimer();
+        }
+
+        function shuffle() {
+            for (let i = 0; i < 1000; i++) {
+                const empty = tiles.indexOf(0);
+                const neighbors = getNeighbors(empty);
+                const random = neighbors[Math.floor(Math.random() * neighbors.length)];
+                [tiles[empty], tiles[random]] = [tiles[random], tiles[empty]];
+            }
+            moves = 0; solved = false;
+            document.getElementById('moves').textContent = 0;
+            document.getElementById('message').textContent = '';
+            render();
+            startTimer();
+        }
+
+        function getNeighbors(i) {
+            const row = Math.floor(i / 4), col = i % 4;
+            const n = [];
+            if (row > 0) n.push(i - 4);
+            if (row < 3) n.push(i + 4);
+            if (col > 0) n.push(i - 1);
+            if (col < 3) n.push(i + 1);
+            return n;
+        }
+
+        function move(i) {
+            if (solved) return;
+            const empty = tiles.indexOf(0);
+            if (getNeighbors(empty).includes(i)) {
+                [tiles[empty], tiles[i]] = [tiles[i], tiles[empty]];
+                moves++;
+                document.getElementById('moves').textContent = moves;
+                render();
+                checkWin();
+            }
+        }
+
+        function checkWin() {
+            const win = tiles.every((t, i) => t === (i + 1) % 16);
+            if (win) {
+                solved = true;
+                clearInterval(timer);
+                document.getElementById('message').textContent = '🎉 恭喜完成!';
+                document.getElementById('message').style.color = '#4fa';
+            }
+        }
+
+        function render() {
+            board.innerHTML = '';
+            tiles.forEach((t, i) => {
+                const tile = document.createElement('div');
+                tile.className = 'tile' + (t === 0 ? ' empty' : '') + (t === (i + 1) % 16 && t !== 0 ? ' correct' : '');
+                tile.textContent = t || '';
+                if (t !== 0) tile.onclick = () => move(i);
+                board.appendChild(tile);
+            });
+        }
+
+        function startTimer() {
+            clearInterval(timer);
+            startTime = Date.now();
+            timer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const m = Math.floor(elapsed / 60), s = elapsed % 60;
+                document.getElementById('time').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+            }, 1000);
+        }
+
+        document.getElementById('shuffleBtn').addEventListener('click', shuffle);
+        init();
+    </script>
+</body>
+</html>

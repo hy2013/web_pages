@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>记忆翻牌</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .title { font-size: 24px; font-weight: 900; color: #f6f; margin-bottom: 10px; }
+        #ui { width: 100%; max-width: 320px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(255,100,255,0.2); border: 2px solid #f6f; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #f6f; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; background: #2a2a4a; padding: 8px; border-radius: 8px; }
+        .card { width: 65px; height: 65px; background: #4a4a6a; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; transform: rotateY(0deg); transition: transform 0.3s; }
+        .card.flipped { background: #6a6a8a; transform: rotateY(180deg); }
+        .card.matched { background: #4a4; opacity: 0.5; }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #f6f 0%, #d4d 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #fff; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">🃏 记忆翻牌</div>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>步数: <b id="moves">0</b></span></div></div>
+        <div class="grid" id="grid"></div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const icons = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒', '🥝', '🍑'];
+        let cards = [], flipped = [], matched = 0, score = 0, moves = 0, lock = false;
+
+        function init() { cards = []; flipped = []; matched = 0; score = 0; moves = 0; lock = false; const pairs = [...icons, ...icons].sort(() => Math.random() - 0.5); const g = document.getElementById('grid'); g.innerHTML = ''; pairs.forEach((icon, i) => { const c = document.createElement('div'); c.className = 'card'; c.textContent = ''; c.dataset.icon = icon; c.dataset.index = i; c.onclick = () => flipCard(c); g.appendChild(c); }); document.getElementById('score').textContent = 0; document.getElementById('moves').textContent = 0; }
+
+        function flipCard(c) { if (lock || c.classList.contains('flipped') || c.classList.contains('matched')) return; c.classList.add('flipped'); c.textContent = c.dataset.icon; flipped.push(c); if (flipped.length === 2) { moves++; document.getElementById('moves').textContent = moves; lock = true; if (flipped[0].dataset.icon === flipped[1].dataset.icon) { flipped[0].classList.add('matched'); flipped[1].classList.add('matched'); score += 10; matched++; flipped = []; lock = false; document.getElementById('score').textContent = score; if (matched >= 8) setTimeout(() => alert('恭喜! 得分: ' + score), 100); } else { setTimeout(() => { flipped[0].classList.remove('flipped'); flipped[0].textContent = ''; flipped[1].classList.remove('flipped'); flipped[1].textContent = ''; flipped = []; lock = false; }, 800); } } }
+
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

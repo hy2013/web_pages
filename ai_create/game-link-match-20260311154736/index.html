@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>连连看</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px; }
+        .title { font-size: 24px; font-weight: 900; color: #fff; margin-bottom: 10px; }
+        #ui { width: 100%; max-width: 350px; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .score-box { background: rgba(255,255,255,0.1); border: 2px solid #fff; border-radius: 6px; padding: 5px 12px; }
+        .score-box span { color: #fff; font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; background: #2a2a4a; padding: 8px; border-radius: 8px; }
+        .cell { width: 45px; height: 45px; background: #3a3a5a; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 24px; cursor: pointer; }
+        .cell.selected { background: #6cf; box-shadow: 0 0 10px #6cf; }
+        .cell.matched { background: #4a4; opacity: 0.5; }
+        .btn { margin-top: 10px; background: linear-gradient(135deg, #6cf 0%, #48c 100%); border: none; padding: 10px 25px; font-size: 14px; font-weight: bold; color: #fff; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div class="title">🔗 连连看</div>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div><div class="score-box"><span>剩余: <b id="left">30</b></span></div></div>
+        <div class="grid" id="grid"></div>
+        <button class="btn" id="restartBtn">重新开始</button>
+    </div>
+    <script>
+        const icons = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝', '🥑', '🍍'];
+        let grid = [], selected = null, score = 0, pairs = 0, totalPairs = 30;
+
+        function init() {
+            grid = []; let cards = [];
+            for (let i = 0; i < 15; i++) { cards.push(icons[i % icons.length], icons[i % icons.length]); }
+            cards.sort(() => Math.random() - 0.5);
+            for (let i = 0; i < 6; i++) { grid[i] = []; for (let j = 0; j < 6; j++) { grid[i][j] = { icon: cards[i*6+j], selected: false, matched: false }; } }
+            selected = null; score = 0; pairs = 0; render();
+        }
+
+        function render() {
+            const g = document.getElementById('grid'); g.innerHTML = '';
+            grid.forEach((row, i) => row.forEach((cell, j) => {
+                const d = document.createElement('div'); d.className = 'cell' + (cell.selected ? ' selected' : '') + (cell.matched ? ' matched' : ''); d.textContent = cell.icon; d.onclick = () => clickCell(i, j); g.appendChild(d);
+            }));
+            document.getElementById('score').textContent = score;
+            document.getElementById('left').textContent = totalPairs - pairs;
+            if (pairs >= totalPairs) setTimeout(() => alert('恭喜过关! 得分: ' + score), 100);
+        }
+
+        function clickCell(i, j) {
+            if (grid[i][j].matched) return;
+            if (selected) {
+                if (selected.i === i && selected.j === j) { grid[i][j].selected = false; selected = null; }
+                else if (grid[selected.i][selected.j].icon === grid[i][j].icon && canConnect(selected.i, selected.j, i, j)) {
+                    grid[selected.i][selected.j].matched = true; grid[i][j].matched = true; selected = null; score += 10; pairs++; render();
+                } else { grid[selected.i][selected.j].selected = false; grid[i][j].selected = true; selected = { i, j }; }
+            } else { grid[i][j].selected = true; selected = { i, j }; }
+            render();
+        }
+
+        function canConnect(x1, y1, x2, y2) {
+            if (x1 === x2 || y1 === y2) return true;
+            for (let i = 0; i < 6; i++) { if (grid[i][y1].matched && grid[i][y2].matched) return true; }
+            for (let j = 0; j < 6; j++) { if (grid[x1][j].matched && grid[x2][j].matched) return true; }
+            return false;
+        }
+
+        document.getElementById('restartBtn').onclick = init;
+        init();
+    </script>
+</body>
+</html>

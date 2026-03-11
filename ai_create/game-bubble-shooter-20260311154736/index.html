@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>泡泡龙</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: none; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #0a0a1a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 10px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box { background: rgba(100,200,255,0.2); border: 2px solid #6cf; border-radius: 8px; padding: 5; }
+        .score-box span {px 12px color: #6cf; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(10,10,26,0.95); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #6cf; text-shadow: 0 0 20px #6cf; margin-bottom: 15px; }
+        .subtitle { color: #88a; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #6cf 0%, #48c 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #000; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span>得分: <b id="score">0</b></span></div></div>
+        <div id="startScreen">
+            <div class="title">🫧 泡泡龙</div>
+            <div class="subtitle">点击发射泡泡<br>3个以上相同颜色消除<br>清除所有泡泡获胜</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, r = 18, cols = 9, rows = 10, grid = [], score = 0, player = {}, bullets = [], gameRunning = false;
+        const COLORS = ['#f44', '#4f4', '#44f', '#ff4', '#f4f', '#4ff'];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); grid = []; for (let i = 0; i < rows; i++) { grid[i] = []; for (let j = 0; j < cols; j++) { if (i < 3) grid[i][j] = { color: COLORS[Math.floor(Math.random() * COLORS.length)], active: true }; else grid[i][j] = { color: null, active: false }; } } player = { x: w / 2, y: h - 50, color: COLORS[Math.floor(Math.random() * COLORS.length)] }; bullets = []; score = 0; document.getElementById('score').textContent = 0; }
+
+        function shoot(angle) { const speed = 12; bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, color: player.color }); }
+        
+        function findCluster(i, j, color, visited = new Set()) {
+            const key = i + ',' + j; if (visited.has(key)) return []; visited.add(key);
+            if (i < 0 || i >= rows || j < 0 || j >= cols || !grid[i][j].active || grid[i][j].color !== color) return [];
+            let cluster = [{ i, j }];
+            cluster = cluster.concat(findCluster(i - 1, j, color, visited));
+            cluster = cluster.concat(findCluster(i + 1, j, color, visited));
+            cluster = cluster.concat(findCluster(i, j - 1, color, visited));
+            cluster = cluster.concat(findCluster(i, j + 1, color, visited));
+            return cluster;
+        }
+
+        function removeFloating() {
+            for (let j = 0; j < cols; j++) {
+                let visited = new Set(), queue = [{ i: 0, j }];
+                if (!grid[0][j].active) continue;
+                while (queue.length) { const { i, j: jj } = queue.shift(); const key = i + ',' + jj; if (visited.has(key)) continue; visited.add(key); if (!grid[i][jj].active) continue; queue.push({ i: i - 1, j: jj }, { i: i + 1, j: jj }, { i, j: jj - 1 }, { i, j: jj + 1 }); }
+                for (let i = 0; i < rows; i++) { if (grid[i][j].active && !visited.has(i + ',' + j)) { grid[i][j].active = false; score += 20; } }
+            }
+            document.getElementById('score').textContent = score;
+        }
+
+        function update() {
+            if (!gameRunning) return;
+            bullets.forEach((b, i) => { b.x += b.vx; b.y += b.vy;
+                if (b.x < r || b.x > w - r) b.vx *= -1;
+                if (b.y < r) { bullets.splice(i, 1); player.color = COLORS[Math.floor(Math.random() * COLORS.length)]; }
+                for (let i = 0; i < rows; i++) { for (let j = 0; j < cols; j++) { if (grid[i][j].active) { const dx = b.x - (j * r * 2 + r + (i % 2) * r), dy = b.y - (i * r * 1.7 + r); if (Math.sqrt(dx * dx + dy * dy) < r * 2) { const cluster = findCluster(i, j, b.color); if (cluster.length >= 3) { cluster.forEach(({ i, j }) => { grid[i][j].active = false; score += 10; }); removeFloating(); } bullets.splice(i, 1); player.color = COLORS[Math.floor(Math.random() * COLORS.length)]; } } } }
+            });
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, w, h);
+            for (let i = 0; i < rows; i++) { for (let j = 0; j < cols; j++) { if (grid[i][j].active) { const x = j * r * 2 + r + (i % 2) * r, y = i * r * 1.7 + r; ctx.fillStyle = grid[i][j].color; ctx.beginPath(); ctx.arc(x, y, r - 1, 0, Math.PI * 2); ctx.fill(); } } }
+            bullets.forEach(b => { ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, r - 1, 0, Math.PI * 2); ctx.fill(); });
+            ctx.fillStyle = player.color; ctx.beginPath(); ctx.arc(player.x, player.y, r, 0, Math.PI * 2); ctx.fill();
+        }
+
+        document.getElementById('gameContainer').addEventListener('click', e => {
+            if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); return; }
+            const rect = canvas.getBoundingClientRect(), angle = Math.atan2(e.clientY - rect.top - player.y, e.clientX - rect.left - player.x); shoot(angle);
+        });
+    </script>
+</body>
+</html>

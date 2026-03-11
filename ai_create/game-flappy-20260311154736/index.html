@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>像素鸟</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #70c5ce; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: linear-gradient(180deg, #70c5ce 0%, #fff 50%, #70c5ce 100%); overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; pointer-events: none; z-index: 10; text-align: center; }
+        .score-box { display: inline-block; background: rgba(255,255,255,0.8); border: 2px solid #333; border-radius: 8px; padding: 8px 20px; }
+        .score-box span { color: #333; font-size: 24px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.8); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #333; margin-bottom: 15px; }
+        .subtitle { color: #666; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(180deg, #ff6b35 0%, #f7931e 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui"><div class="score-box"><span id="score">0</span></div></div>
+        <div id="startScreen">
+            <div class="title">🐦 像素鸟</div>
+            <div class="subtitle">点击或敲击飞行<br>躲避管子<br>坚持越远分数越高</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, gameRunning = false;
+        let bird = { x: 0, y: 0, vy: 0 }, pipes = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); bird = { x: w * 0.3, y: h / 2, vy: 0 }; pipes = []; score = 0; document.getElementById('score').textContent = 0; }
+
+        function jump() { bird.vy = -8; }
+
+        function update() {
+            if (!gameRunning) return;
+            bird.vy += 0.4;
+            bird.y += bird.vy;
+            if (bird.y < 20 || bird.y > h - 20) { gameOver(); return; }
+            if (pipes.length === 0 || pipes[pipes.length - 1].x < w - 150) { pipes.push({ x: w, gap: 120, top: Math.random() * (h - 250) + 50 }); }
+            pipes.forEach((p, i) => { p.x -= 3; if (bird.x + 20 > p.x && bird.x - 20 < p.x + 50 && (bird.y - 15 < p.top || bird.y + 15 > p.top + p.gap)) { gameOver(); } if (p.x + 50 < bird.x && !p.scored) { score++; p.scored = true; document.getElementById('score').textContent = score; } if (p.x < -50) pipes.splice(i, 1); });
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#70c5ce'; ctx.fillRect(0, 0, w, h); ctx.fillStyle = '#fff'; ctx.fillRect(0, h - 30, w, 30); pipes.forEach(p => { ctx.fillStyle = '#73bf2e'; ctx.fillRect(p.x, 0, 50, p.top); ctx.fillRect(p.x, p.top + p.gap, 50, h - p.top - p.gap); ctx.fillStyle = '#5a9c1a'; ctx.fillRect(p.x + 5, 0, 5, p.top - 5); ctx.fillRect(p.x + 5, p.top + p.gap + 5, 5, h - p.top - p.gap - 5); }); ctx.fillStyle = '#f7931e'; ctx.fillRect(bird.x - 15, bird.y - 12, 30, 24); ctx.fillStyle = '#fff'; ctx.fillRect(bird.x - 8, bird.y - 6, 10, 10); ctx.fillStyle = '#000'; ctx.fillRect(bird.x - 4, bird.y - 2, 4, 4); }
+
+        function gameOver() { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; }
+
+        const c = document.getElementById('gameContainer');
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } else jump(); });
+        c.addEventListener('mousedown', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); update(); } else jump(); });
+        init();
+    </script>
+</body>
+</html>

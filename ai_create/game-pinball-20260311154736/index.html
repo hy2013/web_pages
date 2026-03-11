@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>弹球</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+        body { width: 100vw; height: 100vh; overflow: hidden; background: #1a1a2e; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; }
+        #gameContainer { width: 100%; height: 100%; max-width: 428px; position: relative; background: #0f0f1a; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #ui { position: absolute; top: 0; left: 0; width: 100%; padding: 15px; display: flex; justify-content: space-between; pointer-events: none; z-index: 10; }
+        .score-box, .hp-box { background: rgba(255,100,255,0.2); border: 2px solid #f6f; border-radius: 8px; padding: 8px 15px; }
+        .score-box span, .hp-box span { color: #f6f; font-size: 16px; font-weight: bold; }
+        #startScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(15,15,26,0.97); z-index: 20; }
+        .title { font-size: 32px; font-weight: 900; color: #f6f; text-shadow: 0 0 20px #f6f; margin-bottom: 15px; }
+        .subtitle { color: #88a; font-size: 13px; margin-bottom: 25px; text-align: center; line-height: 1.8; }
+        .btn { background: linear-gradient(135deg, #f6f 0%, #d4d 100%); border: none; padding: 12px 35px; font-size: 16px; font-weight: bold; color: #fff; border-radius: 20px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div class="score-box"><span>得分: <b id="score">0</b></span></div>
+            <div class="hp-box"><span>生命: <b id="hp">100</b>%</span></div>
+        </div>
+        <div id="startScreen">
+            <div class="title">🎯 弹球</div>
+            <div class="subtitle">拖动左右挡板<br>反弹球得分<br>球掉落扣生命</div>
+            <button class="btn" id="startBtn">开始</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('gameCanvas'), ctx = canvas.getContext('2d');
+        let w, h, score = 0, hp = 100, gameRunning = false;
+        let paddle, ball, pegs = [], particles = [];
+
+        function resize() { const c = document.getElementById('gameContainer'); w = c.clientWidth; h = c.clientHeight; canvas.width = w; canvas.height = h; }
+        function init() { resize(); paddle = { x: w/2, y: h - 60, w: 80, h: 12 }; ball = { x: w/2, y: h - 100, r: 10, vx: 3, vy: -4 }; pegs = []; for (let i = 0; i < 5; i++) { for (let j = 0; j < 8; j++) { if (Math.random() > 0.3) pegs.push({ x: 30 + j * (w-60)/7, y: 80 + i * 50, r: 8, active: true, color: ['#f66', '#6f6', '#66f', '#ff6', '#f6f'][Math.floor(Math.random()*5)] }); } } score = 0; hp = 100; document.getElementById('score').textContent = 0; document.getElementById('hp').textContent = 100; }
+
+        function update() {
+            if (!gameRunning) return;
+            ball.x += ball.vx; ball.y += ball.vy;
+            if (ball.x < ball.r || ball.x > w - ball.r) ball.vx *= -1;
+            if (ball.y < ball.r) ball.vy *= -1;
+            if (ball.y + ball.r > paddle.y && ball.y - ball.r < paddle.y + paddle.h && ball.x > paddle.x - paddle.w/2 && ball.x < paddle.x + paddle.w/2) { ball.vy = -Math.abs(ball.vy); ball.vx += (ball.x - paddle.x) * 0.05; }
+            if (ball.y > h) { hp -= 25; document.getElementById('hp').textContent = hp; if (hp <= 0) { gameRunning = false; alert('游戏结束! 得分: ' + score); document.getElementById('startScreen').style.display = 'flex'; } else { ball.x = w/2; ball.y = h - 100; ball.vx = 3; ball.vy = -4; } }
+            pegs.forEach(p => { if (!p.active) return; const dx = ball.x - p.x, dy = ball.y - p.y, dist = Math.sqrt(dx*dx+dy*dy); if (dist < ball.r + p.r) { const angle = Math.atan2(dy, dx); ball.vx = Math.cos(angle) * 5; ball.vy = Math.sin(angle) * 5; p.active = false; score += 10; document.getElementById('score').textContent = score; } });
+            if (pegs.every(p => !p.active)) { score += 100; pegs.forEach(p => p.active = true); }
+            draw(); requestAnimationFrame(update);
+        }
+
+        function draw() { ctx.fillStyle = '#0f0f1a'; ctx.fillRect(0, 0, w, h); pegs.forEach(p => { if (!p.active) return; ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 10; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill(); }); ctx.shadowBlur = 0; ctx.fillStyle = '#f6f'; ctx.fillRect(paddle.x - paddle.w/2, paddle.y, paddle.w, paddle.h); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2); ctx.fill(); }
+
+        const c = document.getElementById('gameContainer'); let dragging = false;
+        c.addEventListener('touchstart', e => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); } dragging = true; });
+        c.addEventListener('touchmove', e => { if (dragging) paddle.x = e.touches[0].clientX; });
+        c.addEventListener('touchend', () => dragging = false);
+        c.addEventListener('mousedown', () => { if (!gameRunning) { gameRunning = true; document.getElementById('startScreen').style.display = 'none'; init(); } dragging = true; });
+        c.addEventListener('mousemove', e => { if (dragging) paddle.x = e.clientX; });
+        c.addEventListener('mouseup', () => dragging = false);
+        init();
+    </script>
+</body>
+</html>
