@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <style>
+        /* 全局样式重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 页面头部 */
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            font-weight: 600;
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* 预览网格 */
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* 预览卡片 */
+        .preview-card {
+            background-color: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .preview-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        /* 预览内容区域 */
+        .preview-content {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            position: relative;
+            background-color: #f0f0f0;
+        }
+
+        .preview-content iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            transition: opacity 0.3s ease;
+        }
+
+        /* 加载状态 */
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(255, 255, 255, 0.8);
+            z-index: 10;
+        }
+
+        .loading::after {
+            content: '';
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 预览标题 */
+        .preview-title {
+            padding: 1rem;
+            font-weight: 500;
+            text-align: center;
+            background-color: white;
+        }
+
+        /* 全屏预览模式 */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 全屏内容容器 */
+        .fullscreen-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            overflow: hidden;
+            animation: scaleIn 0.3s ease;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* 退出按钮 */
+        .exit-fullscreen {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1010;
+            transition: all 0.3s ease;
+        }
+
+        .exit-fullscreen:hover {
+            background-color: rgba(255, 0, 0, 0.8);
+            transform: rotate(90deg);
+        }
+
+        /* 全屏iframe */
+        .fullscreen-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        /* 错误提示 */
+        .error {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 992px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .preview-grid {
+                grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+                gap: 1rem;
+            }
+
+            .fullscreen-overlay {
+                padding: 0;
+            }
+
+            .exit-fullscreen {
+                width: 35px;
+                height: 35px;
+                font-size: 1.2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .preview-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-content {
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 页面头部 -->
+    <!-- <header>
+        <h1></h1>
+    </header> -->
+
+    <!-- 主内容区域 -->
+    <main class="container">
+        <!-- 预览网格 -->
+        <div class="preview-grid" id="previewGrid"></div>
+    </main>
+
+    <!-- 全屏预览覆盖层 -->
+    <div class="fullscreen-overlay" id="fullscreenOverlay">
+        <div class="fullscreen-content">
+            <button type="button" class="exit-fullscreen" id="exitFullscreen" title="退出全屏">×</button>
+            <iframe class="fullscreen-iframe" id="fullscreenIframe" title="全屏预览" src="about:blank"></iframe>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取所有CSS Doodle HTML文件
+            const files = getAllFiles();
+            // 渲染预览网格
+            renderPreviewGrid(files);
+            // 设置事件监听
+            setupEventListeners();
+        });
+
+        /**
+         * @returns {Array} 文件列表
+         */
+        function getAllFiles() {
+            // 返回实际存在的效果文件列表
+            const files = [
+                {
+                    name: "box",
+                    path: "box/index.html"
+                },
+                {
+                    name: "cherry",
+                    path: "cherry/index.html"
+                },
+                {
+                    name: "particles",
+                    path: "particles/index.html"
+                },
+                {
+                    name: "shadertoy-template",
+                    path: "shadertoy-template/index.html"
+                },
+                {
+                    name: "shadertoy-viewer",
+                    path: "shadertoy-viewer/index.html"
+                },
+                {
+                    name: "webgl-water",
+                    path: "webgl-water/index.html"
+                }
+            ];
+            return files;
+        }
+
+        /**
+         * 渲染预览网格
+         * @param {Array} files 文件列表
+         */
+        function renderPreviewGrid(files) {
+            const grid = document.getElementById('previewGrid');
+            grid.innerHTML = '';
+
+            files.forEach(file => {
+                // 创建预览卡片
+                const card = document.createElement('div');
+                card.className = 'preview-card';
+                card.dataset.path = file.path;
+
+                // 预览内容区域
+                const content = document.createElement('div');
+                content.className = 'preview-content';
+
+                // 加载状态
+                const loading = document.createElement('div');
+                loading.className = 'loading';
+                content.appendChild(loading);
+
+                // iframe预览
+                const iframe = document.createElement('iframe');
+                iframe.src = file.path;
+                iframe.onload = () => {
+                    loading.style.display = 'none';
+                    iframe.style.opacity = '1';
+                };
+                iframe.onerror = () => {
+                    loading.style.display = 'none';
+                    const error = document.createElement('div');
+                    error.className = 'error';
+                    error.textContent = '加载失败';
+                    content.appendChild(error);
+                };
+                content.appendChild(iframe);
+
+                // 标题
+                const title = document.createElement('div');
+                title.className = 'preview-title';
+                title.textContent = file.name;
+
+                // 组装卡片
+                card.appendChild(content);
+                card.appendChild(title);
+                grid.appendChild(card);
+
+                // 点击事件
+                card.addEventListener('click', () => {
+                    openFullscreen(file.path);
+                });
+            });
+        }
+
+        /**
+         * 设置事件监听
+         */
+        function setupEventListeners() {
+            // 退出全屏按钮
+            document.getElementById('exitFullscreen').addEventListener('click', closeFullscreen);
+
+            // 点击覆盖层退出全屏
+            document.getElementById('fullscreenOverlay').addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    closeFullscreen();
+                }
+            });
+
+            // ESC键退出全屏
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && isFullscreenActive()) {
+                    closeFullscreen();
+                }
+            });
+        }
+
+        // 保存滚动位置
+        let savedScrollPosition = 0;
+        
+        /**
+         * 打开全屏预览
+         * @param {string} filePath 文件路径
+         */
+        function openFullscreen(filePath) {
+            const overlay = document.getElementById('fullscreenOverlay');
+            const iframe = document.getElementById('fullscreenIframe');
+            
+            // 保存当前滚动位置
+            savedScrollPosition = window.scrollY;
+            
+            // 显示加载状态
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            iframe.parentNode.insertBefore(loading, iframe);
+            
+            // 设置iframe内容 - 使用replace避免添加历史记录
+            iframe.onload = () => {
+                loading.remove();
+            };
+            iframe.onerror = () => {
+                loading.remove();
+                alert('加载失败，请重试');
+            };
+            
+            // 先重置再加载，避免历史记录问题
+            if (iframe.contentWindow && iframe.contentWindow.location) {
+                iframe.contentWindow.location.replace(filePath);
+            } else {
+                iframe.src = filePath;
+            }
+            
+            // 显示全屏覆盖层
+            overlay.style.display = 'flex';
+            
+            // 进入浏览器全屏模式
+            enterBrowserFullscreen(overlay);
+        }
+
+        /**
+         * 关闭全屏预览
+         */
+        function closeFullscreen() {
+            const overlay = document.getElementById('fullscreenOverlay');
+            const iframe = document.getElementById('fullscreenIframe');
+            
+            // 清空iframe内容
+            // iframe.src = 'about:blank';
+            
+            // 隐藏全屏覆盖层
+            overlay.style.display = 'none';
+            
+            // 退出浏览器全屏模式
+            exitBrowserFullscreen();
+            
+            // 恢复滚动位置
+            window.scrollTo(0, savedScrollPosition);
+        }
+
+        /**
+         * 进入浏览器全屏模式
+         * @param {HTMLElement} element 要全屏的元素
+         */
+        function enterBrowserFullscreen(element) {
+            if (element.requestFullscreen) {
+                element.requestFullscreen();
+            } else if (element.webkitRequestFullscreen) {
+                element.webkitRequestFullscreen();
+            } else if (element.msRequestFullscreen) {
+                element.msRequestFullscreen();
+            }
+        }
+
+        /**
+         * 退出浏览器全屏模式
+         */
+        function exitBrowserFullscreen() {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+
+        /**
+         * 检查是否处于全屏模式
+         * @returns {boolean} 是否处于全屏模式
+         */
+        function isFullscreenActive() {
+            return !!document.fullscreenElement || 
+                   !!document.webkitFullscreenElement || 
+                   !!document.msFullscreenElement;
+        }
+    </script>
+</body>
+</html>
