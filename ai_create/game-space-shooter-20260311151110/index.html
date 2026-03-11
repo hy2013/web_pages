@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>太空射击</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Orbitron', Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            max-width: 428px;
+            position: relative;
+            overflow: hidden;
+            background: radial-gradient(ellipse at bottom, #1a0a2e 0%, #000 70%);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .score-box {
+            background: rgba(0, 255, 255, 0.15);
+            border: 2px solid #0ff;
+            border-radius: 8px;
+            padding: 8px 16px;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+
+        .score-box span {
+            color: #0ff;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #0ff;
+        }
+
+        .hp-box {
+            background: rgba(255, 50, 50, 0.15);
+            border: 2px solid #f00;
+            border-radius: 8px;
+            padding: 8px 16px;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+        }
+
+        .hp-box span {
+            color: #f55;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 20;
+        }
+
+        #gameOverScreen {
+            display: none;
+        }
+
+        .title {
+            font-size: 38px;
+            font-weight: 900;
+            color: #0ff;
+            text-shadow: 0 0 30px #0ff, 0 0 60px #0088ff;
+            margin-bottom: 15px;
+            letter-spacing: 4px;
+        }
+
+        .subtitle {
+            color: #88a;
+            font-size: 13px;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 2;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00ffff 0%, #0088ff 100%);
+            border: none;
+            padding: 16px 50px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #000;
+            border-radius: 30px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .final-score {
+            font-size: 26px;
+            color: #ff0;
+            margin: 15px 0;
+            text-shadow: 0 0 15px #ff0;
+        }
+
+        .tap-hint {
+            position: absolute;
+            bottom: 60px;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">
+            <div class="score-box">
+                <span>得分: <b id="score">0</b></span>
+            </div>
+            <div class="hp-box">
+                <span>生命: <b id="hp">100</b>%</span>
+            </div>
+        </div>
+        <div id="startScreen">
+            <div class="title">太空射击</div>
+            <div class="subtitle">
+                点击或滑动发射子弹<br>
+                击毁陨石保护飞船<br>
+                被击中会损失生命值
+            </div>
+            <button class="btn" id="startBtn">开始战斗</button>
+            <div class="tap-hint">点击屏幕任意位置</div>
+        </div>
+        <div id="gameOverScreen">
+            <div class="title">游戏结束</div>
+            <div class="final-score">最终得分: <span id="finalScore">0</span></div>
+            <button class="btn" id="restartBtn">再来一次</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('gameContainer');
+        
+        let width, height;
+        let gameRunning = false;
+        let score = 0;
+        let hp = 100;
+        let player, bullets, enemies, particles, stars;
+        let lastTime = 0;
+        let shootCooldown = 0;
+        let spawnTimer = 0;
+
+        function resize() {
+            const rect = container.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            
+            player = {
+                x: width / 2,
+                y: height - 80,
+                size: 30,
+                angle: 0
+            };
+            
+            bullets = [];
+            enemies = [];
+            particles = [];
+            stars = [];
+            
+            for (let i = 0; i < 100; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2,
+                    speed: 0.5 + Math.random() * 2,
+                    brightness: Math.random()
+                });
+            }
+            
+            score = 0;
+            hp = 100;
+            spawnTimer = 0;
+            shootCooldown = 0;
+            
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('hp').textContent = hp;
+        }
+
+        function spawnEnemy() {
+            const size = 25 + Math.random() * 30;
+            enemies.push({
+                x: Math.random() * (width - size * 2) + size,
+                y: -size,
+                size: size,
+                vy: 2 + Math.random() * 2 + score * 0.001,
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.1,
+                type: Math.random() > 0.7 ? 'boss' : 'normal'
+            });
+        }
+
+        function createExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 5;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    life: 1,
+                    decay: 0.02 + Math.random() * 0.02,
+                    size: 3 + Math.random() * 6,
+                    color: color
+                });
+            }
+        }
+
+        function shoot(targetX, targetY) {
+            if (shootCooldown > 0) return;
+            
+            const dx = targetX - player.x;
+            const dy = targetY - player.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            bullets.push({
+                x: player.x,
+                y: player.y - player.size,
+                vx: (dx / dist) * 15,
+                vy: (dy / dist) * 15,
+                size: 6
+            });
+            
+            shootCooldown = 8;
+        }
+
+        function update(timestamp) {
+            if (!gameRunning) return;
+            
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            
+            if (deltaTime > 100) {
+                requestAnimationFrame(update);
+                return;
+            }
+            
+            if (shootCooldown > 0) shootCooldown--;
+            
+            stars.forEach(star => {
+                star.y += star.speed;
+                star.brightness = 0.5 + Math.sin(timestamp * 0.003 + star.x) * 0.5;
+                if (star.y > height) {
+                    star.y = 0;
+                    star.x = Math.random() * width;
+                }
+            });
+            
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
+                bullet.x += bullet.vx;
+                bullet.y += bullet.vy;
+                
+                if (bullet.x < 0 || bullet.x > width || bullet.y < 0 || bullet.y > height) {
+                    bullets.splice(i, 1);
+                }
+            }
+            
+            spawnTimer++;
+            const spawnRate = Math.max(25, 60 - Math.floor(score / 100));
+            if (spawnTimer > spawnRate) {
+                spawnTimer = 0;
+                spawnEnemy();
+            }
+            
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const enemy = enemies[i];
+                enemy.y += enemy.vy;
+                enemy.rotation += enemy.rotationSpeed;
+                
+                const dx = player.x - enemy.x;
+                const dy = player.y - enemy.y;
+                const distPlayer = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distPlayer < player.size + enemy.size * 0.7) {
+                    hp -= 20;
+                    createExplosion(enemy.x, enemy.y, '#f00', 25);
+                    enemies.splice(i, 1);
+                    updateUI();
+                    
+                    if (hp <= 0) {
+                        gameOver();
+                        return;
+                    }
+                    continue;
+                }
+                
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const bullet = bullets[j];
+                    const dx = bullet.x - enemy.x;
+                    const dy = bullet.y - enemy.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < bullet.size + enemy.size * 0.7) {
+                        const points = enemy.type === 'boss' ? 50 : 10;
+                        score += points;
+                        
+                        createExplosion(enemy.x, enemy.y, enemy.type === 'boss' ? '#ff0' : '#f80', 20);
+                        
+                        enemies.splice(i, 1);
+                        bullets.splice(j, 1);
+                        
+                        updateUI();
+                        break;
+                    }
+                }
+                
+                if (enemy.y > height + enemy.size) {
+                    enemies.splice(i, 1);
+                }
+            }
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.05;
+                p.life -= p.decay;
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+            
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            
+            stars.forEach(star => {
+                ctx.fillStyle = `rgba(255, 255, 255, ${star.brightness * 0.8})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+            
+            bullets.forEach(bullet => {
+                ctx.save();
+                ctx.shadowColor = '#0ff';
+                ctx.shadowBlur = 15;
+                ctx.fillStyle = '#0ff';
+                ctx.beginPath();
+                ctx.arc(bullet.x, bullet.y, bullet.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+            
+            enemies.forEach(enemy => {
+                ctx.save();
+                ctx.translate(enemy.x, enemy.y);
+                ctx.rotate(enemy.rotation);
+                
+                ctx.shadowColor = enemy.type === 'boss' ? '#ff0' : '#f80';
+                ctx.shadowBlur = 20;
+                ctx.strokeStyle = enemy.type === 'boss' ? '#ff0' : '#f80';
+                ctx.lineWidth = 3;
+                
+                ctx.beginPath();
+                const points = enemy.type === 'boss' ? 6 : 5;
+                for (let i = 0; i < points; i++) {
+                    const angle = (i * 2 * Math.PI) / points;
+                    const r = i % 2 === 0 ? enemy.size : enemy.size * 0.5;
+                    const px = Math.cos(angle) * r;
+                    const py = Math.sin(angle) * r;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                
+                if (enemy.type === 'boss') {
+                    ctx.fillStyle = 'rgba(255, 200, 0, 0.3)';
+                    ctx.fill();
+                }
+                
+                ctx.restore();
+            });
+            
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            
+            ctx.shadowColor = '#0ff';
+            ctx.shadowBlur = 25;
+            ctx.fillStyle = '#0ff';
+            ctx.beginPath();
+            ctx.moveTo(0, -player.size);
+            ctx.lineTo(-player.size * 0.7, player.size * 0.5);
+            ctx.lineTo(0, player.size * 0.2);
+            ctx.lineTo(player.size * 0.7, player.size * 0.5);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#0088ff';
+            ctx.beginPath();
+            ctx.moveTo(0, -player.size * 0.5);
+            ctx.lineTo(-player.size * 0.3, player.size * 0.2);
+            ctx.lineTo(0, player.size * 0.05);
+            ctx.lineTo(player.size * 0.3, player.size * 0.2);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function startGame() {
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            gameRunning = true;
+            init();
+            lastTime = performance.now();
+            requestAnimationFrame(update);
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        function handleInput(x, y) {
+            if (!gameRunning) return;
+            shoot(x, y);
+        }
+
+        container.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!gameRunning && document.getElementById('startScreen').style.display !== 'none') {
+                startGame();
+            } else {
+                const touch = e.touches[0];
+                handleInput(touch.clientX, touch.clientY);
+            }
+        });
+
+        container.addEventListener('click', (e) => {
+            if (!gameRunning && document.getElementById('startScreen').style.display !== 'none') {
+                startGame();
+            } else {
+                const rect = container.getBoundingClientRect();
+                handleInput(e.clientX - rect.left, e.clientY - rect.top);
+            }
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        init();
+    </script>
+</body>
+</html>
