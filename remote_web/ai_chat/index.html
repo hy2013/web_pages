@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI聊天助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        .app-card {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+        .app-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+        }
+        .app-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+        .app-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin: 0;
+        }
+        .app-desc {
+            font-size: 12px;
+            color: #999;
+            margin-top: 6px;
+        }
+        .header {
+            color: white;
+            text-align: center;
+            padding: 40px 20px 30px;
+        }
+        .header h1 {
+            font-size: 24px;
+            margin: 0 0 8px;
+            font-weight: 700;
+        }
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+            margin: 0;
+        }
+        .grid-container {
+            padding: 0 16px 30px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .icon-deepseek {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+        .icon-doubao {
+            background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+        }
+        .icon-tongyi {
+            background: linear-gradient(135deg, #f59e0b 0%, #ef4444 100%);
+        }
+        .icon-xunfei {
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+        }
+        .icon-zhipu {
+            background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+        }
+        .icon-wenxin {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI聊天助手</h1>
+        <p>选择一个AI开始对话</p>
+    </div>
+    
+    <div class="grid-container">
+        <a href="#" class="app-card">
+            <div class="app-icon icon-deepseek">
+                <span style="color: white;">D</span>
+            </div>
+            <h3 class="app-name">DeepSeek</h3>
+            <p class="app-desc">深度求索</p>
+        </a>
+        
+        <a href="#" class="app-card">
+            <div class="app-icon icon-doubao">
+                <span style="color: white;">豆</span>
+            </div>
+            <h3 class="app-name">豆包</h3>
+            <p class="app-desc">字节跳动</p>
+        </a>
+        
+        <a href="#" class="app-card">
+            <div class="app-icon icon-tongyi">
+                <span style="color: white;">通</span>
+            </div>
+            <h3 class="app-name">通义千问</h3>
+            <p class="app-desc">阿里云</p>
+        </a>
+        
+        <a href="#" class="app-card">
+            <div class="app-icon icon-xunfei">
+                <span style="color: white;">讯</span>
+            </div>
+            <h3 class="app-name">讯飞星火</h3>
+            <p class="app-desc">科大讯飞</p>
+        </a>
+        
+        <a href="#" class="app-card">
+            <div class="app-icon icon-zhipu">
+                <span style="color: white;">智</span>
+            </div>
+            <h3 class="app-name">智谱清言</h3>
+            <p class="app-desc">智谱AI</p>
+        </a>
+        
+        <a href="#" class="app-card">
+            <div class="app-icon icon-wenxin">
+                <span style="color: white;">文</span>
+            </div>
+            <h3 class="app-name">文心一言</h3>
+            <p class="app-desc">百度</p>
+        </a>
+    </div>
+</body>
+</html>
