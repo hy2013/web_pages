@@ -1,6 +1,5 @@
 {
-  "icon_item_datas": [
-    "icon_item_data/icon_item_data_1.csv",
-    "icon_item_data/icon_item_data_2.csv"
+  "remote_web_list": [
+    "remote_web_list/remote_web_list_1.csv"
   ]
 }
