@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>iOS Desktop Simulator</title>
     <style>
+        /* CSS变量定义 - 用于响应式设计 */
+        :root {
+            --drag-threshold: 80px;
+            --icon-size: 64px;
+            --gap-size: 15px;
+            --animation-duration: 0.25s;
+            --animation-timing: ease-out;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -150,8 +159,9 @@
         /* 页面滑动容器 */
         .pages-wrapper {
             display: flex;
-            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1);
             height: 100%;
+            will-change: transform;
         }
 
         .page {
@@ -180,34 +190,67 @@
             align-items: center;
             gap: 6px;
             cursor: pointer;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
             position: relative;
             -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .app-icon.editing {
-            animation: wiggle 0.5s ease-in-out infinite;
+            animation: wiggle 0.8s ease-in-out infinite;
         }
 
         .app-icon.dragging {
             animation: none;
             transform: scale(1.15);
             z-index: 1000;
-            opacity: 0.9;
+            opacity: 0.85;
+            transition: none;
+            pointer-events: none;
         }
 
         .app-icon.dragging .icon-image {
             box-shadow: 
-                0 8px 20px rgba(0, 0, 0, 0.5),
-                0 12px 30px rgba(0, 0, 0, 0.4);
+                0 10px 25px rgba(0, 0, 0, 0.6),
+                0 15px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .app-icon.drag-over {
+            transform: scale(0.95);
+            opacity: 0.7;
+            transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+        }
+
+        .app-icon.preview-position {
+            position: relative;
+            z-index: 999;
+        }
+
+        .app-icon.preview-position::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            animation: pulse-preview 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-preview {
+            0%, 100% { opacity: 0.3; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.1); }
         }
 
         @keyframes wiggle {
             0%, 100% { transform: translateY(0) rotate(0deg); }
-            20% { transform: translateY(0) rotate(-4deg); }
-            40% { transform: translateY(0) rotate(4deg); }
-            60% { transform: translateY(0) rotate(-4deg); }
-            80% { transform: translateY(0) rotate(4deg); }
+            25% { transform: translateY(-1px) rotate(-1deg); }
+            75% { transform: translateY(-1px) rotate(1deg); }
         }
 
         .icon-image {
@@ -223,20 +266,54 @@
             box-shadow: 
                 0 2px 10px rgba(0, 0, 0, 0.35),
                 0 4px 20px rgba(0, 0, 0, 0.25);
-            transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+            transition: transform 0.25s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+            will-change: transform;
         }
 
         .app-icon:hover .icon-image {
-            transform: scale(1.08);
+            transform: scale(1.05);
             box-shadow: 
                 0 4px 15px rgba(0, 0, 0, 0.4),
                 0 6px 25px rgba(0, 0, 0, 0.3);
         }
 
         .app-icon:active .icon-image {
-            transform: scale(0.95);
+            transform: scale(0.92);
             box-shadow: 
                 0 1px 5px rgba(0, 0, 0, 0.3);
+            transition: transform 0.1s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        /* 拖动状态提示 */
+        .drag-status-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            font-size: 14px;
+            color: #333;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .drag-status-indicator.show {
+            opacity: 1;
+        }
+
+        .drag-status-indicator.success {
+            background: rgba(52, 199, 89, 0.9);
+            color: white;
+        }
+
+        .drag-status-indicator.error {
+            background: rgba(255, 59, 48, 0.9);
+            color: white;
         }
 
         /* 删除按钮（编辑模式） */
@@ -684,6 +761,9 @@
         </div>
     </div>
 
+    <!-- 拖动状态提示 -->
+    <div id="dragStatusIndicator" class="drag-status-indicator"></div>
+
     <script>
         // 状态栏时间更新
         function updateTime() {
@@ -695,14 +775,36 @@
         updateTime();
         setInterval(updateTime, 1000);
 
-        // 页面滑动功能
+        // 页面滑动功能 - iOS标准交互
         let currentPage = 0;
         const totalPages = 2;
         const pagesWrapper = document.getElementById('pagesWrapper');
         const indicators = document.querySelectorAll('.indicator-dot');
+        const screenContainer = document.querySelector('.screen-container');
 
-        function goToPage(pageIndex) {
+        // iOS标准滑动参数
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let currentY = 0;
+        let startTime = 0;
+        let isPageDragging = false;
+        let velocityX = 0;
+        let lastMoveTime = 0;
+        let lastMoveX = 0;
+        const VELOCITY_THRESHOLD = 0.3; // iOS标准速度阈值
+        const DECELERATION_RATE = 0.95; // iOS标准减速率
+        const BOUNCE_STIFFNESS = 0.7; // iOS标准回弹刚度
+
+        function goToPage(pageIndex, animate = true) {
             currentPage = pageIndex;
+            
+            if (animate) {
+                pagesWrapper.style.transition = 'transform 0.5s cubic-bezier(0.23, 1, 0.32, 1)';
+            } else {
+                pagesWrapper.style.transition = 'none';
+            }
+            
             pagesWrapper.style.transform = `translateX(-${pageIndex * 100}%)`;
             
             indicators.forEach((dot, index) => {
@@ -710,59 +812,148 @@
             });
         }
 
-        // 触摸滑动支持
-        let startX = 0;
-        let currentX = 0;
-        isPageDragging = false;
+        // iOS标准惯性滑动计算
+        function calculateInertiaSlide(velocity, currentOffset) {
+            // 根据速度和当前位置计算目标页面
+            const containerWidth = screenContainer.offsetWidth;
+            const threshold = containerWidth * 0.25;
+            
+            // 如果速度足够快，使用速度判断
+            if (Math.abs(velocity) > VELOCITY_THRESHOLD) {
+                if (velocity > 0 && currentPage > 0) {
+                    return currentPage - 1;
+                } else if (velocity < 0 && currentPage < totalPages - 1) {
+                    return currentPage + 1;
+                }
+            }
+            
+            // 否则使用位置判断
+            if (currentOffset > threshold && currentPage > 0) {
+                return currentPage - 1;
+            } else if (currentOffset < -threshold && currentPage < totalPages - 1) {
+                return currentPage + 1;
+            }
+            
+            return currentPage;
+        }
 
-        const screenContainer = document.querySelector('.screen-container');
+        // iOS标准边缘回弹效果
+        function applyBounceEffect(offset) {
+            const maxOffset = 0;
+            const minOffset = -(totalPages - 1) * screenContainer.offsetWidth;
+            
+            if (offset > maxOffset) {
+                // 左边界回弹
+                return maxOffset + (offset - maxOffset) * BOUNCE_STIFFNESS;
+            } else if (offset < minOffset) {
+                // 右边界回弹
+                return minOffset + (offset - minOffset) * BOUNCE_STIFFNESS;
+            }
+            
+            return offset;
+        }
 
+        // 触摸滑动支持 - iOS标准
         screenContainer.addEventListener('touchstart', (e) => {
             if (isAppDragging) return;
+            
             startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            startTime = Date.now();
+            lastMoveTime = startTime;
+            lastMoveX = startX;
             isPageDragging = true;
-        });
+            velocityX = 0;
+            
+            // 移除过渡效果，准备实时拖动
+            pagesWrapper.style.transition = 'none';
+        }, { passive: true });
 
         screenContainer.addEventListener('touchmove', (e) => {
             if (!isPageDragging || isAppDragging) return;
+            
             currentX = e.touches[0].clientX;
+            currentY = e.touches[0].clientY;
+            
+            // 计算速度
+            const now = Date.now();
+            const deltaTime = now - lastMoveTime;
+            if (deltaTime > 0) {
+                velocityX = (currentX - lastMoveX) / deltaTime;
+                lastMoveTime = now;
+                lastMoveX = currentX;
+            }
+            
+            // 计算偏移
             const diff = currentX - startX;
-            const baseTranslate = -currentPage * 100;
-            const dragTranslate = (diff / screenContainer.offsetWidth) * 100;
-            pagesWrapper.style.transform = `translateX(${baseTranslate + dragTranslate}%)`;
-        });
+            const baseOffset = -currentPage * screenContainer.offsetWidth;
+            let newOffset = baseOffset + diff;
+            
+            // 应用边缘回弹效果
+            newOffset = applyBounceEffect(newOffset);
+            
+            // 实时更新位置
+            pagesWrapper.style.transform = `translateX(${newOffset}px)`;
+            
+            // 防止垂直滚动（如果水平滑动明显）
+            if (Math.abs(diff) > 10) {
+                e.preventDefault();
+            }
+        }, { passive: false });
 
         screenContainer.addEventListener('touchend', (e) => {
             if (!isPageDragging || isAppDragging) return;
             isPageDragging = false;
             
             const diff = currentX - startX;
-            const threshold = screenContainer.offsetWidth * 0.3;
+            const targetPage = calculateInertiaSlide(velocityX, diff);
             
-            if (diff > threshold && currentPage > 0) {
-                goToPage(currentPage - 1);
-            } else if (diff < -threshold && currentPage < totalPages - 1) {
-                goToPage(currentPage + 1);
-            } else {
-                goToPage(currentPage);
-            }
-        });
+            // iOS标准动画过渡到目标页面
+            goToPage(targetPage, true);
+            
+            // 清除速度
+            velocityX = 0;
+        }, { passive: true });
 
-        // 鼠标滑动支持（桌面端）
+        // 鼠标滑动支持（桌面端） - iOS标准
         screenContainer.addEventListener('mousedown', (e) => {
             if (isAppDragging) return;
+            
             startX = e.clientX;
+            startY = e.clientY;
+            startTime = Date.now();
+            lastMoveTime = startTime;
+            lastMoveX = startX;
             isPageDragging = true;
+            velocityX = 0;
+            
+            pagesWrapper.style.transition = 'none';
             e.preventDefault();
         });
 
         screenContainer.addEventListener('mousemove', (e) => {
             if (!isPageDragging || isAppDragging) return;
+            
             currentX = e.clientX;
+            currentY = e.clientY;
+            
+            // 计算速度
+            const now = Date.now();
+            const deltaTime = now - lastMoveTime;
+            if (deltaTime > 0) {
+                velocityX = (currentX - lastMoveX) / deltaTime;
+                lastMoveTime = now;
+                lastMoveX = currentX;
+            }
+            
             const diff = currentX - startX;
-            const baseTranslate = -currentPage * 100;
-            const dragTranslate = (diff / screenContainer.offsetWidth) * 100;
-            pagesWrapper.style.transform = `translateX(${baseTranslate + dragTranslate}%)`;
+            const baseOffset = -currentPage * screenContainer.offsetWidth;
+            let newOffset = baseOffset + diff;
+            
+            // 应用边缘回弹效果
+            newOffset = applyBounceEffect(newOffset);
+            
+            pagesWrapper.style.transform = `translateX(${newOffset}px)`;
         });
 
         screenContainer.addEventListener('mouseup', (e) => {
@@ -770,32 +961,28 @@
             isPageDragging = false;
             
             const diff = currentX - startX;
-            const threshold = screenContainer.offsetWidth * 0.2;
+            const targetPage = calculateInertiaSlide(velocityX, diff);
             
-            if (diff > threshold && currentPage > 0) {
-                goToPage(currentPage - 1);
-            } else if (diff < -threshold && currentPage < totalPages - 1) {
-                goToPage(currentPage + 1);
-            } else {
-                goToPage(currentPage);
-            }
+            goToPage(targetPage, true);
+            velocityX = 0;
         });
 
         screenContainer.addEventListener('mouseleave', () => {
             if (isPageDragging && !isAppDragging) {
                 isPageDragging = false;
-                goToPage(currentPage);
+                goToPage(currentPage, true);
+                velocityX = 0;
             }
         });
 
         // 页面指示器点击
         indicators.forEach((dot, index) => {
             dot.addEventListener('click', () => {
-                goToPage(index);
+                goToPage(index, true);
             });
         });
 
-        // 长按进入编辑模式
+        // 长按进入编辑模式 - iOS标准
         let longPressTimer = null;
         let isEditMode = false;
         let isAppDragging = false;
@@ -805,13 +992,38 @@
         let dragStartY = 0;
         let dragOffsetX = 0;
         let dragOffsetY = 0;
+        let dragVelocityX = 0;
+        let dragVelocityY = 0;
+        let lastDragMoveTime = 0;
+        let lastDragMoveX = 0;
+        let lastDragMoveY = 0;
+        let dragStartTime = 0;
+        let lastRearrangeTime = 0;
         const allApps = document.querySelectorAll('.app-icon');
+        const dragStatusIndicator = document.getElementById('dragStatusIndicator');
+
+        // 拖动状态提示函数
+        function showDragStatus(message, type = 'default') {
+            dragStatusIndicator.textContent = message;
+            dragStatusIndicator.className = `drag-status-indicator show ${type}`;
+            
+            setTimeout(() => {
+                dragStatusIndicator.className = 'drag-status-indicator';
+            }, 1500);
+        }
 
         function enterEditMode() {
             isEditMode = true;
             allApps.forEach(app => {
                 app.classList.add('editing');
             });
+            
+            // iOS标准触觉反馈（如果支持）
+            if (navigator.vibrate) {
+                navigator.vibrate(10);
+            }
+            
+            showDragStatus('编辑模式已开启', 'success');
         }
 
         function exitEditMode() {
@@ -819,14 +1031,19 @@
             allApps.forEach(app => {
                 app.classList.remove('editing');
                 app.classList.remove('dragging');
+                app.classList.remove('drag-over');
+                app.classList.remove('preview-position');
                 app.style.transform = '';
                 app.style.position = '';
                 app.style.left = '';
                 app.style.top = '';
+                app.style.transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)';
             });
             if (draggedApp) {
                 draggedApp = null;
             }
+            
+            showDragStatus('编辑模式已关闭', 'success');
         }
 
         // 获取图标在网格中的位置
@@ -843,14 +1060,19 @@
                 x: rect.left,
                 y: rect.top,
                 centerX: rect.left + rect.width / 2,
-                centerY: rect.top + rect.height / 2
+                centerY: rect.top + rect.height / 2,
+                width: rect.width,
+                height: rect.height
             };
         }
 
-        // 找到最近的图标位置
+        // 找到最近的图标位置 - iOS标准精准触发
         function findNearestAppPosition(x, y, currentPageApps) {
             let nearestIndex = -1;
             let minDistance = Infinity;
+            // 根据屏幕尺寸动态调整阈值
+            const screenSize = Math.min(window.innerWidth, window.innerHeight);
+            const thresholdDistance = screenSize < 400 ? 60 : screenSize < 600 ? 70 : 80;
 
             currentPageApps.forEach((app, index) => {
                 if (app === draggedApp) return;
@@ -859,7 +1081,7 @@
                     Math.pow(x - pos.centerX, 2) + 
                     Math.pow(y - pos.centerY, 2)
                 );
-                if (distance < minDistance) {
+                if (distance < minDistance && distance < thresholdDistance) {
                     minDistance = distance;
                     nearestIndex = index;
                 }
@@ -868,51 +1090,137 @@
             return nearestIndex;
         }
 
-        // 重新排列图标
+        // 重新排列图标 - iOS标准平滑动画（200-300ms，ease-out）
         function rearrangeApps(fromIndex, toIndex, grid) {
             const apps = Array.from(grid.children);
             
-            if (fromIndex < toIndex) {
-                // 向后移动
-                for (let i = fromIndex; i < toIndex; i++) {
-                    grid.insertBefore(apps[i + 1], apps[i]);
+            if (draggedApp) {
+                // 保存被拖动图标的位置
+                const draggedLeft = draggedApp.style.left;
+                const draggedTop = draggedApp.style.top;
+                
+                // 使用transform动画让图标平滑移动
+                const iconSize = apps[0].offsetWidth;
+                const gap = 15; // 与CSS中的gap保持一致
+                
+                // 先给所有非拖动图标添加过渡动画（200-300ms，ease-out）
+                apps.forEach((app) => {
+                    if (app !== draggedApp) {
+                        app.style.transition = 'transform 0.25s ease-out';
+                    }
+                });
+                
+                // 根据移动方向应用transform
+                if (fromIndex < toIndex) {
+                    // 向后移动：前移的图标向右移动
+                    for (let i = fromIndex; i < toIndex; i++) {
+                        const app = apps[i + 1];
+                        if (app !== draggedApp) {
+                            app.style.transform = `translateX(-${iconSize + gap}px)`;
+                        }
+                    }
+                } else if (fromIndex > toIndex) {
+                    // 向前移动：后移的图标向左移动
+                    for (let i = fromIndex; i > toIndex; i--) {
+                        const app = apps[i - 1];
+                        if (app !== draggedApp) {
+                            app.style.transform = `translateX(${iconSize + gap}px)`;
+                        }
+                    }
                 }
-            } else if (fromIndex > toIndex) {
-                // 向前移动
-                for (let i = fromIndex; i > toIndex; i--) {
-                    grid.insertBefore(apps[i], apps[i - 1]);
-                }
+                
+                // 等待动画帧后执行DOM移动
+                requestAnimationFrame(() => {
+                    if (fromIndex < toIndex) {
+                        for (let i = fromIndex; i < toIndex; i++) {
+                            grid.insertBefore(apps[i + 1], apps[i]);
+                        }
+                    } else if (fromIndex > toIndex) {
+                        for (let i = fromIndex; i > toIndex; i--) {
+                            grid.insertBefore(apps[i], apps[i - 1]);
+                        }
+                    }
+                    
+                    // 重置所有transform
+                    requestAnimationFrame(() => {
+                        apps.forEach((app) => {
+                            if (app !== draggedApp) {
+                                app.style.transition = 'none';
+                                app.style.transform = '';
+                            }
+                        });
+                        
+                        // 确保被拖动图标保持在当前位置
+                        if (draggedApp) {
+                            draggedApp.style.left = draggedLeft;
+                            draggedApp.style.top = draggedTop;
+                        }
+                    });
+                });
             }
         }
 
-        // 开始拖动图标
+        // 开始拖动图标 - iOS标准精准触发
         function startDragApp(app, clientX, clientY) {
             if (!isEditMode) return;
+            
+            const now = Date.now();
+            // 防止快速连续拖动时的响应延迟
+            if (now - lastRearrangeTime < 100) return;
             
             isAppDragging = true;
             draggedApp = app;
             draggedAppOriginalIndex = getAppGridPosition(app);
+            dragStartTime = now;
             
             const rect = app.getBoundingClientRect();
-            dragOffsetX = clientX - rect.left;
-            dragOffsetY = clientY - rect.top;
+            // 精准计算偏移量，避免定位偏移
+            dragOffsetX = clientX - rect.left - rect.width / 2;
+            dragOffsetY = clientY - rect.top - rect.height / 2;
             dragStartX = clientX;
             dragStartY = clientY;
+            lastDragMoveTime = now;
+            lastDragMoveX = clientX;
+            lastDragMoveY = clientY;
+            dragVelocityX = 0;
+            dragVelocityY = 0;
             
+            // 拖动状态视觉区分
             app.classList.add('dragging');
             app.classList.remove('editing');
             app.style.position = 'fixed';
             app.style.left = `${rect.left}px`;
             app.style.top = `${rect.top}px`;
             app.style.zIndex = '1000';
+            app.style.transition = 'none';
+            
+            // iOS标准触觉反馈
+            if (navigator.vibrate) {
+                navigator.vibrate(5);
+            }
+            
+            showDragStatus('拖动中...', 'default');
         }
 
-        // 拖动图标移动
+        // 拖动图标移动 - iOS标准精准定位
         function moveDragApp(clientX, clientY) {
             if (!isAppDragging || !draggedApp) return;
             
-            const newX = clientX - dragOffsetX;
-            const newY = clientY - dragOffsetY;
+            // 计算速度
+            const now = Date.now();
+            const deltaTime = now - lastDragMoveTime;
+            if (deltaTime > 0) {
+                dragVelocityX = (clientX - lastDragMoveX) / deltaTime;
+                dragVelocityY = (clientY - lastDragMoveY) / deltaTime;
+                lastDragMoveTime = now;
+                lastDragMoveX = clientX;
+                lastDragMoveY = clientY;
+            }
+            
+            // iOS标准：精准定位，避免偏移
+            const rect = draggedApp.getBoundingClientRect();
+            const newX = clientX - dragOffsetX - rect.width / 2;
+            const newY = clientY - dragOffsetY - rect.height / 2;
             
             draggedApp.style.left = `${newX}px`;
             draggedApp.style.top = `${newY}px`;
@@ -924,60 +1232,135 @@
             const nearestIndex = findNearestAppPosition(clientX, clientY, currentPageApps);
             
             if (nearestIndex !== -1 && nearestIndex !== getAppGridPosition(draggedApp)) {
-                const currentDraggedIndex = getAppGridPosition(draggedApp);
-                rearrangeApps(currentDraggedIndex, nearestIndex, currentGrid);
+                // 防止快速连续拖动时的响应延迟
+                if (now - lastRearrangeTime > 150) {
+                    const currentDraggedIndex = getAppGridPosition(draggedApp);
+                    rearrangeApps(currentDraggedIndex, nearestIndex, currentGrid);
+                    lastRearrangeTime = now;
+                    
+                    // iOS标准触觉反馈
+                    if (navigator.vibrate) {
+                        navigator.vibrate(3);
+                    }
+                    
+                    // 添加位置预览指示器
+                    currentPageApps.forEach((app, index) => {
+                        if (index === nearestIndex && app !== draggedApp) {
+                            app.classList.add('preview-position');
+                        } else {
+                            app.classList.remove('preview-position');
+                        }
+                    });
+                }
+            } else {
+                // 移除所有预览指示器
+                currentPageApps.forEach(app => {
+                    app.classList.remove('preview-position');
+                });
             }
         }
 
-        // 结束拖动图标
+        // 结束拖动图标 - iOS标准惯性效果和精准定位
         function endDragApp() {
             if (!isAppDragging || !draggedApp) return;
             
             isAppDragging = false;
             
-            // 重置图标样式
-            draggedApp.classList.remove('dragging');
-            draggedApp.classList.add('editing');
-            draggedApp.style.position = '';
-            draggedApp.style.left = '';
-            draggedApp.style.top = '';
-            draggedApp.style.zIndex = '';
-            draggedApp.style.transform = '';
+            // 移除所有预览指示器
+            const currentGrid = document.querySelector(`#page${currentPage + 1} .apps-grid`);
+            const currentPageApps = Array.from(currentGrid.children);
+            currentPageApps.forEach(app => {
+                app.classList.remove('preview-position');
+            });
             
-            draggedApp = null;
+            // iOS标准：添加惯性效果
+            const inertiaX = dragVelocityX * 50;
+            const inertiaY = dragVelocityY * 50;
+            
+            // 计算最终位置（带惯性）
+            const currentLeft = parseFloat(draggedApp.style.left);
+            const currentTop = parseFloat(draggedApp.style.top);
+            const finalLeft = currentLeft + inertiaX;
+            const finalTop = currentTop + inertiaY;
+            
+            // 应用惯性动画
+            draggedApp.style.transition = 'left 0.3s cubic-bezier(0.23, 1, 0.32, 1), top 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+            draggedApp.style.left = `${finalLeft}px`;
+            draggedApp.style.top = `${finalTop}px`;
+            
+            // 等待惯性动画完成后重置
+            setTimeout(() => {
+                // 重置图标样式
+                draggedApp.classList.remove('dragging');
+                draggedApp.classList.add('editing');
+                draggedApp.style.position = '';
+                draggedApp.style.left = '';
+                draggedApp.style.top = '';
+                draggedApp.style.zIndex = '';
+                draggedApp.style.transform = '';
+                draggedApp.style.transition = 'transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)';
+                
+                // 显示操作成功提示
+                showDragStatus('位置已更新', 'success');
+                
+                draggedApp = null;
+            }, 300);
         }
 
-        // 触摸事件处理
+        // 触摸事件处理 - iOS标准精准触发
         allApps.forEach(app => {
+            let touchStartTime = 0;
+            let touchMoved = false;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            
             app.addEventListener('touchstart', (e) => {
                 if (isAppDragging) return;
                 
                 const clientX = e.touches[0].clientX;
                 const clientY = e.touches[0].clientY;
+                touchStartTime = Date.now();
+                touchStartX = clientX;
+                touchStartY = clientY;
+                touchMoved = false;
                 
                 if (isEditMode) {
                     startDragApp(app, clientX, clientY);
                     e.preventDefault();
                 } else {
+                    // iOS标准：500ms长按进入编辑模式
                     longPressTimer = setTimeout(() => {
-                        enterEditMode();
+                        if (!touchMoved) {
+                            enterEditMode();
+                        }
                     }, 500);
                 }
-            });
+            }, { passive: false });
 
             app.addEventListener('touchmove', (e) => {
-                if (longPressTimer) {
-                    clearTimeout(longPressTimer);
-                    longPressTimer = null;
-                }
+                const clientX = e.touches[0].clientX;
+                const clientY = e.touches[0].clientY;
                 
-                if (isAppDragging && draggedApp === app) {
-                    const clientX = e.touches[0].clientX;
-                    const clientY = e.touches[0].clientY;
-                    moveDragApp(clientX, clientY);
-                    e.preventDefault();
+                // 精准判断是否移动（避免误触）
+                const moveDistance = Math.sqrt(
+                    Math.pow(clientX - touchStartX, 2) + 
+                    Math.pow(clientY - touchStartY, 2)
+                );
+                
+                if (moveDistance > 10) {
+                    touchMoved = true;
+                    
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                    
+                    if (isAppDragging && draggedApp === app) {
+                        moveDragApp(clientX, clientY);
+                        e.preventDefault();
+                    }
                 }
-            });
+            }, { passive: false });
 
             app.addEventListener('touchend', (e) => {
                 if (longPressTimer) {
@@ -988,35 +1371,59 @@
                 if (isAppDragging && draggedApp === app) {
                     endDragApp();
                 }
-            });
+                
+                touchMoved = false;
+            }, { passive: true });
 
-            // 鼠标事件处理（桌面端）
+            // 鼠标事件处理（桌面端） - iOS标准精准触发
+            let mouseStartTime = 0;
+            let mouseMoved = false;
+            let mouseStartX = 0;
+            let mouseStartY = 0;
+            
             app.addEventListener('mousedown', (e) => {
                 if (isAppDragging) return;
                 
                 const clientX = e.clientX;
                 const clientY = e.clientY;
+                mouseStartTime = Date.now();
+                mouseStartX = clientX;
+                mouseStartY = clientY;
+                mouseMoved = false;
                 
                 if (isEditMode) {
                     startDragApp(app, clientX, clientY);
                     e.preventDefault();
                 } else {
                     longPressTimer = setTimeout(() => {
-                        enterEditMode();
+                        if (!mouseMoved) {
+                            enterEditMode();
+                        }
                     }, 500);
                 }
             });
 
             app.addEventListener('mousemove', (e) => {
-                if (longPressTimer) {
-                    clearTimeout(longPressTimer);
-                    longPressTimer = null;
-                }
+                const clientX = e.clientX;
+                const clientY = e.clientY;
                 
-                if (isAppDragging && draggedApp === app) {
-                    const clientX = e.clientX;
-                    const clientY = e.clientY;
-                    moveDragApp(clientX, clientY);
+                // 精准判断是否移动（避免误触）
+                const moveDistance = Math.sqrt(
+                    Math.pow(clientX - mouseStartX, 2) + 
+                    Math.pow(clientY - mouseStartY, 2)
+                );
+                
+                if (moveDistance > 10) {
+                    mouseMoved = true;
+                    
+                    if (longPressTimer) {
+                        clearTimeout(longPressTimer);
+                        longPressTimer = null;
+                    }
+                    
+                    if (isAppDragging && draggedApp === app) {
+                        moveDragApp(clientX, clientY);
+                    }
                 }
             });
 
@@ -1029,6 +1436,8 @@
                 if (isAppDragging && draggedApp === app) {
                     endDragApp();
                 }
+                
+                mouseMoved = false;
             });
 
             app.addEventListener('mouseleave', () => {
@@ -1036,6 +1445,12 @@
                     clearTimeout(longPressTimer);
                     longPressTimer = null;
                 }
+                
+                if (isAppDragging && draggedApp === app) {
+                    endDragApp();
+                }
+                
+                mouseMoved = false;
             });
 
             // 删除按钮点击
@@ -1045,7 +1460,19 @@
                     e.stopPropagation();
                     e.preventDefault();
                     if (isEditMode) {
-                        app.style.display = 'none';
+                        // iOS标准删除动画
+                        app.style.transition = 'transform 0.3s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+                        app.style.transform = 'scale(0)';
+                        app.style.opacity = '0';
+                        
+                        setTimeout(() => {
+                            app.style.display = 'none';
+                        }, 300);
+                        
+                        // iOS标准触觉反馈
+                        if (navigator.vibrate) {
+                            navigator.vibrate(10);
+                        }
                     }
                 });
             }
@@ -1081,6 +1508,134 @@
                 console.log(`Opening ${appName} from dock`);
             });
         });
+
+        // iOS标准：防止页面滚动时的意外触发
+        document.addEventListener('touchmove', (e) => {
+            if (isPageDragging || isAppDragging) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // iOS标准：优化性能，减少重绘
+        let lastRenderTime = 0;
+        const RENDER_INTERVAL = 16; // 60fps
+        
+        function optimizedRender(callback) {
+            const now = Date.now();
+            if (now - lastRenderTime >= RENDER_INTERVAL) {
+                callback();
+                lastRenderTime = now;
+            }
+        }
+
+        // 浏览器兼容性处理
+        function checkBrowserCompatibility() {
+            const warnings = [];
+            
+            // 检查 backdrop-filter 支持
+            if (!CSS.supports('backdrop-filter', 'blur(10px)') && 
+                !CSS.supports('-webkit-backdrop-filter', 'blur(10px)')) {
+                warnings.push('backdrop-filter');
+            }
+            
+            // 检查 CSS Grid 支持
+            if (!CSS.supports('display', 'grid')) {
+                warnings.push('CSS Grid');
+            }
+            
+            // 检查 transform 支持
+            if (!CSS.supports('transform', 'translateX(0)')) {
+                warnings.push('transform');
+            }
+            
+            // 检查 transition 支持
+            if (!CSS.supports('transition', 'transform 0.3s ease-out')) {
+                warnings.push('transition');
+            }
+            
+            if (warnings.length > 0) {
+                console.warn('浏览器可能不支持以下特性:', warnings.join(', '));
+                showDragStatus(`浏览器兼容性警告: ${warnings.join(', ')}`, 'error');
+            }
+            
+            return warnings.length === 0;
+        }
+
+        // 响应式设计优化 - 根据屏幕尺寸调整交互参数
+        function updateResponsiveParameters() {
+            const screenSize = Math.min(window.innerWidth, window.innerHeight);
+            
+            // 根据屏幕尺寸调整拖动阈值
+            if (screenSize < 400) {
+                // 小屏幕设备
+                document.documentElement.style.setProperty('--drag-threshold', '60px');
+            } else if (screenSize < 600) {
+                // 中等屏幕设备
+                document.documentElement.style.setProperty('--drag-threshold', '70px');
+            } else {
+                // 大屏幕设备
+                document.documentElement.style.setProperty('--drag-threshold', '80px');
+            }
+        }
+
+        // 窗口尺寸变化监听
+        let resizeTimeout = null;
+        window.addEventListener('resize', () => {
+            // 防抖处理
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout);
+            }
+            
+            resizeTimeout = setTimeout(() => {
+                updateResponsiveParameters();
+                
+                // 如果正在拖动，需要重新计算位置
+                if (isAppDragging && draggedApp) {
+                    const rect = draggedApp.getBoundingClientRect();
+                    const clientX = parseFloat(draggedApp.style.left) + rect.width / 2;
+                    const clientY = parseFloat(draggedApp.style.top) + rect.height / 2;
+                    moveDragApp(clientX, clientY);
+                }
+            }, 100);
+        });
+
+        // 页面加载完成后初始化
+        window.addEventListener('load', () => {
+            checkBrowserCompatibility();
+            updateResponsiveParameters();
+            
+            // 添加 CSS 变量支持（如果浏览器不支持）
+            if (!window.CSS || !CSS.supports('--test', '0')) {
+                console.warn('浏览器不支持 CSS 变量，部分响应式功能可能受限');
+            }
+        });
+
+        // 性能监控
+        let performanceWarnings = [];
+        function monitorPerformance() {
+            const now = performance.now();
+            
+            // 检查拖动响应时间
+            if (isAppDragging) {
+                const dragDuration = now - dragStartTime;
+                if (dragDuration > 5000) {
+                    performanceWarnings.push('拖动时间过长');
+                }
+            }
+            
+            // 检查动画帧率
+            if (lastRenderTime > 0 && now - lastRenderTime > RENDER_INTERVAL * 2) {
+                performanceWarnings.push('动画帧率下降');
+            }
+            
+            if (performanceWarnings.length > 0) {
+                console.warn('性能警告:', performanceWarnings.join(', '));
+                performanceWarnings = [];
+            }
+        }
+
+        // 定期性能监控
+        setInterval(monitorPerformance, 5000);
     </script>
 </body>
 </html>
