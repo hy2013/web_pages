@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>iOS Desktop Simulator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 100%);
+            min-height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 44px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .signal-bars {
+            display: flex;
+            gap: 2px;
+            align-items: flex-end;
+            height: 12px;
+        }
+
+        .signal-bar {
+            width: 3px;
+            background: white;
+            border-radius: 1px;
+        }
+
+        .signal-bar:nth-child(1) { height: 4px; }
+        .signal-bar:nth-child(2) { height: 6px; }
+        .signal-bar:nth-child(3) { height: 8px; }
+        .signal-bar:nth-child(4) { height: 10px; }
+        .signal-bar:nth-child(5) { height: 12px; }
+
+        .battery {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .battery-body {
+            width: 24px;
+            height: 12px;
+            border: 1.5px solid white;
+            border-radius: 3px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            padding: 2px;
+        }
+
+        .battery-level {
+            width: 80%;
+            height: 100%;
+            background: white;
+            border-radius: 1px;
+        }
+
+        .battery-cap {
+            width: 2px;
+            height: 6px;
+            background: white;
+            border-radius: 1px;
+        }
+
+        /* 主屏幕容器 */
+        .screen-container {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 44px - 90px);
+            margin-top: 44px;
+            overflow: hidden;
+        }
+
+        /* 页面滑动容器 */
+        .pages-wrapper {
+            display: flex;
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            height: 100%;
+        }
+
+        .page {
+            min-width: 100%;
+            height: 100%;
+            padding: 20px 20px 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+
+        /* 应用图标网格 */
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px 15px;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* 应用图标 */
+        .app-icon {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            position: relative;
+        }
+
+        .app-icon.editing {
+            animation: wiggle 0.3s ease-in-out infinite;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            75% { transform: rotate(3deg); }
+        }
+
+        .icon-image {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            position: relative;
+            box-shadow: 
+                0 4px 12px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .app-icon:hover .icon-image {
+            transform: scale(1.05);
+        }
+
+        .app-icon:active .icon-image {
+            transform: scale(0.95);
+        }
+
+        /* 删除按钮（编辑模式） */
+        .delete-badge {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            width: 24px;
+            height: 24px;
+            background: #ff3b30;
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(255, 59, 48, 0.4);
+            z-index: 10;
+        }
+
+        .app-icon.editing .delete-badge {
+            display: flex;
+        }
+
+        .app-name {
+            font-size: 12px;
+            color: white;
+            text-align: center;
+            max-width: 70px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        /* Dock栏 */
+        .dock {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 90px;
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 20px 20px;
+            z-index: 999;
+        }
+
+        .dock::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% 100%, rgba(255, 255, 255, 0.2), transparent);
+            pointer-events: none;
+        }
+
+        .dock-app {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        .dock-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            box-shadow: 
+                0 4px 12px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            transition: transform 0.2s ease;
+        }
+
+        .dock-app:hover .dock-icon {
+            transform: scale(1.1);
+        }
+
+        .dock-app:active .dock-icon {
+            transform: scale(0.95);
+        }
+
+        /* 页面指示器 */
+        .page-indicator {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 998;
+        }
+
+        .indicator-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .indicator-dot.active {
+            background: white;
+            transform: scale(1.2);
+        }
+
+        /* 背景装饰 */
+        .ambient-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(60px);
+            pointer-events: none;
+            z-index: 0;
+            animation: orbFloat 15s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 300px;
+            height: 300px;
+            top: 20%;
+            left: 10%;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3), transparent 70%);
+        }
+
+        .orb-2 {
+            width: 250px;
+            height: 250px;
+            top: 60%;
+            right: 15%;
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.25), transparent 70%);
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 200px;
+            height: 200px;
+            bottom: 30%;
+            left: 30%;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.2), transparent 70%);
+            animation-delay: -10s;
+        }
+
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0); }
+            33% { transform: translate(30px, -20px); }
+            66% { transform: translate(-20px, 30px); }
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 400px) {
+            .apps-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 15px 12px;
+            }
+            .icon-image, .dock-icon {
+                width: 55px;
+                height: 55px;
+                font-size: 28px;
+            }
+            .app-name {
+                font-size: 11px;
+            }
+            .dock {
+                height: 80px;
+                gap: 15px;
+            }
+        }
+
+        @media (min-width: 600px) {
+            .apps-grid {
+                grid-template-columns: repeat(5, 1fr);
+                max-width: 500px;
+            }
+        }
+
+        @media (min-width: 800px) {
+            .apps-grid {
+                grid-template-columns: repeat(6, 1fr);
+                max-width: 600px;
+            }
+        }
+
+        @media (min-width: 1000px) {
+            .apps-grid {
+                grid-template-columns: repeat(7, 1fr);
+                max-width: 700px;
+            }
+        }
+
+        /* 减少动画偏好 */
+        @media (prefers-reduced-motion: reduce) {
+            .app-icon.editing {
+                animation: none;
+            }
+            .ambient-orb {
+                animation: none;
+            }
+            .pages-wrapper {
+                transition: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 背景装饰 -->
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar">
+        <div class="status-left">
+            <span id="time">9:41</span>
+        </div>
+        <div class="status-right">
+            <div class="signal-bars">
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+                <div class="signal-bar"></div>
+            </div>
+            <span>WiFi</span>
+            <div class="battery">
+                <div class="battery-body">
+                    <div class="battery-level"></div>
+                </div>
+                <div class="battery-cap"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主屏幕容器 -->
+    <div class="screen-container">
+        <div class="pages-wrapper" id="pagesWrapper">
+            <!-- 第一页 -->
+            <div class="page" id="page1">
+                <div class="apps-grid">
+                    <div class="app-icon" data-app="messages">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #5ac8fa 0%, #007aff 100%);">
+                            💬
+                        </div>
+                        <span class="app-name">信息</span>
+                    </div>
+                    <div class="app-icon" data-app="phone">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #34c759 0%, #30d158 100%);">
+                            📞
+                        </div>
+                        <span class="app-name">电话</span>
+                    </div>
+                    <div class="app-icon" data-app="camera">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff9500 0%, #ff3b30 100%);">
+                            📷
+                        </div>
+                        <span class="app-name">相机</span>
+                    </div>
+                    <div class="app-icon" data-app="photos">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff2d55 0%, #ff6b6b 100%);">
+                            🖼️
+                        </div>
+                        <span class="app-name">照片</span>
+                    </div>
+                    <div class="app-icon" data-app="mail">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #5ac8fa 0%, #007aff 100%);">
+                            📧
+                        </div>
+                        <span class="app-name">邮件</span>
+                    </div>
+                    <div class="app-icon" data-app="calendar">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);">
+                            📅
+                        </div>
+                        <span class="app-name">日历</span>
+                    </div>
+                    <div class="app-icon" data-app="weather">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #5ac8fa 0%, #64d2ff 100%);">
+                            🌤️
+                        </div>
+                        <span class="app-name">天气</span>
+                    </div>
+                    <div class="app-icon" data-app="clock">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);">
+                            🕐
+                        </div>
+                        <span class="app-name">时钟</span>
+                    </div>
+                    <div class="app-icon" data-app="maps">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #34c759 0%, #30d158 100%);">
+                            🗺️
+                        </div>
+                        <span class="app-name">地图</span>
+                    </div>
+                    <div class="app-icon" data-app="notes">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ffcc00 0%, #ff9500 100%);">
+                            📝
+                        </div>
+                        <span class="app-name">备忘录</span>
+                    </div>
+                    <div class="app-icon" data-app="music">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff2d55 0%, #af52de 100%);">
+                            🎵
+                        </div>
+                        <span class="app-name">音乐</span>
+                    </div>
+                    <div class="app-icon" data-app="settings">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #8e8e93 0%, #636366 100%);">
+                            ⚙️
+                        </div>
+                        <span class="app-name">设置</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第二页 -->
+            <div class="page" id="page2">
+                <div class="apps-grid">
+                    <div class="app-icon" data-app="safari">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #5ac8fa 0%, #007aff 100%);">
+                            🌐
+                        </div>
+                        <span class="app-name">Safari</span>
+                    </div>
+                    <div class="app-icon" data-app="appstore">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #007aff 0%, #5ac8fa 100%);">
+                            📦
+                        </div>
+                        <span class="app-name">App Store</span>
+                    </div>
+                    <div class="app-icon" data-app="health">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff2d55 0%, #ff6b6b 100%);">
+                            ❤️
+                        </div>
+                        <span class="app-name">健康</span>
+                    </div>
+                    <div class="app-icon" data-app="wallet">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #1c1c1e 0%, #2c2c2e 100%);">
+                            💳
+                        </div>
+                        <span class="app-name">钱包</span>
+                    </div>
+                    <div class="app-icon" data-app="facetime">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #34c759 0%, #30d158 100%);">
+                            📹
+                        </div>
+                        <span class="app-name">FaceTime</span>
+                    </div>
+                    <div class="app-icon" data-app="files">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #5ac8fa 0%, #007aff 100%);">
+                            📁
+                        </div>
+                        <span class="app-name">文件</span>
+                    </div>
+                    <div class="app-icon" data-app="reminders">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff9500 0%, #ff3b30 100%);">
+                            ✓
+                        </div>
+                        <span class="app-name">提醒事项</span>
+                    </div>
+                    <div class="app-icon" data-app="news">
+                        <div class="delete-badge">×</div>
+                        <div class="icon-image" style="background: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);">
+                            📰
+                        </div>
+                        <span class="app-name">新闻</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 页面指示器 -->
+    <div class="page-indicator">
+        <div class="indicator-dot active" data-page="0"></div>
+        <div class="indicator-dot" data-page="1"></div>
+    </div>
+
+    <!-- Dock栏 -->
+    <div class="dock">
+        <div class="dock-app" data-app="phone">
+            <div class="dock-icon" style="background: linear-gradient(135deg, #34c759 0%, #30d158 100%);">
+                📞
+            </div>
+        </div>
+        <div class="dock-app" data-app="messages">
+            <div class="dock-icon" style="background: linear-gradient(135deg, #5ac8fa 0%, #007aff 100%);">
+                💬
+            </div>
+        </div>
+        <div class="dock-app" data-app="safari">
+            <div class="dock-icon" style="background: linear-gradient(135deg, #5ac8fa 0%, #007aff 100%);">
+                🌐
+            </div>
+        </div>
+        <div class="dock-app" data-app="music">
+            <div class="dock-icon" style="background: linear-gradient(135deg, #ff2d55 0%, #af52de 100%);">
+                🎵
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 状态栏时间更新
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('time').textContent = `${hours}:${minutes}`;
+        }
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // 页面滑动功能
+        let currentPage = 0;
+        const totalPages = 2;
+        const pagesWrapper = document.getElementById('pagesWrapper');
+        const indicators = document.querySelectorAll('.indicator-dot');
+
+        function goToPage(pageIndex) {
+            currentPage = pageIndex;
+            pagesWrapper.style.transform = `translateX(-${pageIndex * 100}%)`;
+            
+            indicators.forEach((dot, index) => {
+                dot.classList.toggle('active', index === pageIndex);
+            });
+        }
+
+        // 触摸滑动支持
+        let startX = 0;
+        let currentX = 0;
+        let isDragging = false;
+
+        const screenContainer = document.querySelector('.screen-container');
+
+        screenContainer.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            isDragging = true;
+        });
+
+        screenContainer.addEventListener('touchmove', (e) => {
+            if (!isDragging) return;
+            currentX = e.touches[0].clientX;
+            const diff = currentX - startX;
+            const baseTranslate = -currentPage * 100;
+            const dragTranslate = (diff / screenContainer.offsetWidth) * 100;
+            pagesWrapper.style.transform = `translateX(${baseTranslate + dragTranslate}%)`;
+        });
+
+        screenContainer.addEventListener('touchend', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const diff = currentX - startX;
+            const threshold = screenContainer.offsetWidth * 0.3;
+            
+            if (diff > threshold && currentPage > 0) {
+                goToPage(currentPage - 1);
+            } else if (diff < -threshold && currentPage < totalPages - 1) {
+                goToPage(currentPage + 1);
+            } else {
+                goToPage(currentPage);
+            }
+        });
+
+        // 鼠标滑动支持（桌面端）
+        screenContainer.addEventListener('mousedown', (e) => {
+            startX = e.clientX;
+            isDragging = true;
+            e.preventDefault();
+        });
+
+        screenContainer.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            currentX = e.clientX;
+            const diff = currentX - startX;
+            const baseTranslate = -currentPage * 100;
+            const dragTranslate = (diff / screenContainer.offsetWidth) * 100;
+            pagesWrapper.style.transform = `translateX(${baseTranslate + dragTranslate}%)`;
+        });
+
+        screenContainer.addEventListener('mouseup', (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            
+            const diff = currentX - startX;
+            const threshold = screenContainer.offsetWidth * 0.2;
+            
+            if (diff > threshold && currentPage > 0) {
+                goToPage(currentPage - 1);
+            } else if (diff < -threshold && currentPage < totalPages - 1) {
+                goToPage(currentPage + 1);
+            } else {
+                goToPage(currentPage);
+            }
+        });
+
+        screenContainer.addEventListener('mouseleave', () => {
+            if (isDragging) {
+                isDragging = false;
+                goToPage(currentPage);
+            }
+        });
+
+        // 页面指示器点击
+        indicators.forEach((dot, index) => {
+            dot.addEventListener('click', () => {
+                goToPage(index);
+            });
+        });
+
+        // 长按进入编辑模式
+        let longPressTimer = null;
+        let isEditMode = false;
+        const allApps = document.querySelectorAll('.app-icon');
+
+        function enterEditMode() {
+            isEditMode = true;
+            allApps.forEach(app => {
+                app.classList.add('editing');
+            });
+        }
+
+        function exitEditMode() {
+            isEditMode = false;
+            allApps.forEach(app => {
+                app.classList.remove('editing');
+            });
+        }
+
+        allApps.forEach(app => {
+            app.addEventListener('touchstart', (e) => {
+                if (isEditMode) return;
+                longPressTimer = setTimeout(() => {
+                    enterEditMode();
+                }, 500);
+            });
+
+            app.addEventListener('touchend', () => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            });
+
+            app.addEventListener('touchmove', () => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            });
+
+            // 桌面端长按
+            app.addEventListener('mousedown', (e) => {
+                if (isEditMode) return;
+                longPressTimer = setTimeout(() => {
+                    enterEditMode();
+                }, 500);
+            });
+
+            app.addEventListener('mouseup', () => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            });
+
+            app.addEventListener('mouseleave', () => {
+                if (longPressTimer) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            });
+
+            // 删除按钮点击
+            const deleteBadge = app.querySelector('.delete-badge');
+            if (deleteBadge) {
+                deleteBadge.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (isEditMode) {
+                        app.style.display = 'none';
+                    }
+                });
+            }
+        });
+
+        // 点击空白区域退出编辑模式
+        document.addEventListener('click', (e) => {
+            if (isEditMode && !e.target.closest('.app-icon')) {
+                exitEditMode();
+            }
+        });
+
+        // Dock应用点击
+        const dockApps = document.querySelectorAll('.dock-app');
+        dockApps.forEach(app => {
+            app.addEventListener('click', () => {
+                const appName = app.dataset.app;
+                console.log(`Opening ${appName} from dock`);
+            });
+        });
+    </script>
+</body>
+</html>
