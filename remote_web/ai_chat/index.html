@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI聊天助手</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
@@ -12,64 +11,212 @@
             min-height: 100vh;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
+        }
+        * {
+            box-sizing: inherit;
         }
         .app-card {
             background: white;
-            border-radius: 16px;
-            padding: 20px;
+            border-radius: 12px;
+            padding: 12px;
             text-align: center;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
             transition: all 0.3s ease;
             cursor: pointer;
             border: none;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            max-width: 140px;
+            margin: 0 auto;
         }
         .app-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
         }
         .app-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 20px;
-            margin: 0 auto 16px;
+            width: 55px;
+            height: 55px;
+            border-radius: 14px;
+            margin: 0 auto 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 36px;
+            font-size: 26px;
         }
         .app-name {
-            font-size: 16px;
+            font-size: 13px;
             font-weight: 600;
             color: #333;
             margin: 0;
         }
         .app-desc {
-            font-size: 12px;
+            font-size: 10px;
             color: #999;
-            margin-top: 6px;
+            margin-top: 4px;
         }
         .header {
             color: white;
             text-align: center;
-            padding: 40px 20px 30px;
+            padding: 16px 12px;
         }
         .header h1 {
-            font-size: 24px;
-            margin: 0 0 8px;
+            font-size: 20px;
+            margin: 0 0 6px;
             font-weight: 700;
         }
         .header p {
-            font-size: 14px;
+            font-size: 12px;
             opacity: 0.9;
             margin: 0;
         }
         .grid-container {
-            padding: 0 16px 30px;
+            padding: 8px 12px 16px;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-            max-width: 400px;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 10px;
+            max-width: 500px;
             margin: 0 auto;
+            width: 100%;
+        }
+        @media (min-width: 400px) {
+            .app-card {
+                padding: 14px;
+                max-width: 150px;
+            }
+            .app-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 28px;
+                margin-bottom: 12px;
+            }
+            .app-name {
+                font-size: 14px;
+            }
+            .app-desc {
+                font-size: 11px;
+            }
+            .header h1 {
+                font-size: 22px;
+            }
+            .header p {
+                font-size: 13px;
+            }
+        }
+        @media (min-width: 500px) {
+            .grid-container {
+                max-width: 550px;
+                gap: 12px;
+            }
+            .app-card {
+                padding: 16px;
+                max-width: 160px;
+            }
+            .app-icon {
+                width: 65px;
+                height: 65px;
+                font-size: 30px;
+            }
+            .app-name {
+                font-size: 15px;
+            }
+            .header {
+                padding: 20px 16px;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+        @media (min-width: 650px) {
+            .grid-container {
+                max-width: 700px;
+                gap: 14px;
+            }
+            .app-card {
+                padding: 18px;
+                max-width: 170px;
+            }
+            .app-icon {
+                width: 72px;
+                height: 72px;
+                font-size: 32px;
+            }
+            .app-name {
+                font-size: 16px;
+            }
+            .app-desc {
+                font-size: 12px;
+            }
+        }
+        @media (min-width: 800px) {
+            .grid-container {
+                max-width: 850px;
+                gap: 16px;
+            }
+            .app-card {
+                padding: 20px;
+                max-width: 180px;
+            }
+            .app-icon {
+                width: 80px;
+                height: 80px;
+                font-size: 36px;
+            }
+            .header h1 {
+                font-size: 26px;
+            }
+            .header p {
+                font-size: 14px;
+            }
+        }
+        @media (min-width: 1000px) {
+            .grid-container {
+                max-width: 950px;
+                gap: 18px;
+            }
+            .app-card {
+                padding: 22px;
+                max-width: 190px;
+            }
+            .app-icon {
+                width: 85px;
+                height: 85px;
+                font-size: 38px;
+            }
+            .header {
+                padding: 25px 20px;
+            }
+            .header h1 {
+                font-size: 28px;
+            }
+        }
+        @media (min-width: 1200px) {
+            .grid-container {
+                max-width: 1100px;
+                gap: 20px;
+            }
+            .app-card {
+                padding: 24px;
+                max-width: 200px;
+            }
+            .app-icon {
+                width: 90px;
+                height: 90px;
+                font-size: 40px;
+            }
+            .app-name {
+                font-size: 18px;
+            }
+            .app-desc {
+                font-size: 13px;
+            }
+            .header h1 {
+                font-size: 30px;
+            }
+            .header p {
+                font-size: 16px;
+            }
         }
         .icon-deepseek {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
@@ -89,6 +236,15 @@
         .icon-wenxin {
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
         }
+        .icon-yuanbao {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        }
+        .icon-kimi {
+            background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+        }
+        .icon-kouzi {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
     </style>
 </head>
 <body>
@@ -98,7 +254,7 @@
     </div>
     
     <div class="grid-container">
-        <a href="#" class="app-card">
+        <a href="https://www.deepseek.com/" target="_blank" class="app-card">
             <div class="app-icon icon-deepseek">
                 <span style="color: white;">D</span>
             </div>
@@ -106,7 +262,7 @@
             <p class="app-desc">深度求索</p>
         </a>
         
-        <a href="#" class="app-card">
+        <a href="https://www.doubao.com/" target="_blank" class="app-card">
             <div class="app-icon icon-doubao">
                 <span style="color: white;">豆</span>
             </div>
@@ -114,23 +270,23 @@
             <p class="app-desc">字节跳动</p>
         </a>
         
-        <a href="#" class="app-card">
-            <div class="app-icon icon-tongyi">
-                <span style="color: white;">通</span>
+        <a href="https://yuanbao.tencent.com/" target="_blank" class="app-card">
+            <div class="app-icon icon-yuanbao">
+                <span style="color: white;">元</span>
             </div>
-            <h3 class="app-name">通义千问</h3>
-            <p class="app-desc">阿里云</p>
+            <h3 class="app-name">元宝</h3>
+            <p class="app-desc">腾讯</p>
         </a>
         
-        <a href="#" class="app-card">
-            <div class="app-icon icon-xunfei">
-                <span style="color: white;">讯</span>
+        <a href="https://kimi.moonshot.cn/" target="_blank" class="app-card">
+            <div class="app-icon icon-kimi">
+                <span style="color: white;">K</span>
             </div>
-            <h3 class="app-name">讯飞星火</h3>
-            <p class="app-desc">科大讯飞</p>
+            <h3 class="app-name">Kimi</h3>
+            <p class="app-desc">Moonshot</p>
         </a>
         
-        <a href="#" class="app-card">
+        <a href="https://chatglm.cn/" target="_blank" class="app-card">
             <div class="app-icon icon-zhipu">
                 <span style="color: white;">智</span>
             </div>
@@ -138,12 +294,36 @@
             <p class="app-desc">智谱AI</p>
         </a>
         
-        <a href="#" class="app-card">
+        <a href="https://www.coze.cn/" target="_blank" class="app-card">
+            <div class="app-icon icon-kouzi">
+                <span style="color: white;">扣</span>
+            </div>
+            <h3 class="app-name">扣子</h3>
+            <p class="app-desc">字节跳动</p>
+        </a>
+        
+        <a href="https://www.qianwen.com/?source=tongyigw" target="_blank" class="app-card">
+            <div class="app-icon icon-tongyi">
+                <span style="color: white;">通</span>
+            </div>
+            <h3 class="app-name">通义千问</h3>
+            <p class="app-desc">阿里云</p>
+        </a>
+        
+        <a href="https://yiyan.baidu.com/" target="_blank" class="app-card">
             <div class="app-icon icon-wenxin">
                 <span style="color: white;">文</span>
             </div>
             <h3 class="app-name">文心一言</h3>
             <p class="app-desc">百度</p>
+        </a>
+        
+        <a href="https://xinghuo.xfyun.cn/desk" target="_blank" class="app-card">
+            <div class="app-icon icon-xunfei">
+                <span style="color: white;">讯</span>
+            </div>
+            <h3 class="app-name">讯飞星火</h3>
+            <p class="app-desc">科大讯飞</p>
         </a>
     </div>
 </body>
